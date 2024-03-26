@@ -1,0 +1,3 @@
+[submodule "prismatic-vlms"]
+	path = prismatic-vlms
+	url = https://github.com/allenzren/prismatic-vlms.git

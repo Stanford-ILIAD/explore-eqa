@@ -1,0 +1,49 @@
+# General
+seed: 42
+exp_name: clip_exp
+output_parent_dir: results
+question_data_path: data/questions.csv
+init_pose_data_path: data/scene_init_poses.csv
+scene_data_path: /n/fs/llm-unc/hm3dsem-train
+save_obs: true
+save_freq: 10
+
+# Question answering
+vlm:
+  hf_token:
+  device: cuda
+  model_id: prism-dinosiglip+7b
+
+# Camera, image
+camera_height: 1.5
+camera_tilt_deg: -30
+img_width: 640
+img_height: 480
+hfov: 120
+tsdf_grid_size: 0.1
+margin_w_ratio: 0.25
+margin_h_ratio: 0.6
+
+# Navigation
+init_clearance: 0.5
+max_step_room_size_ratio: 3
+black_pixel_ratio: 0.5
+min_random_init_steps: 2
+
+# Semantic map
+planner:
+  dist_T: 10
+  unexplored_T: 0.2
+  unoccupied_T: 2.0
+  val_T: 0.5
+  val_dir_T: 0.5
+  max_val_check_frontier: 3
+  smooth_sigma: 5
+  eps: 1
+  min_dist_from_cur: 0.5
+  max_dist_from_cur: 3
+  frontier_spacing: 1.5
+  frontier_min_neighbors: 3
+  frontier_max_neighbors: 4
+  max_unexplored_check_frontier: 3
+  max_unoccupied_check_frontier: 1

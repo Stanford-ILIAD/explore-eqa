@@ -1,0 +1,14 @@
+# General
+seed: 42
+exp_name: test_scene
+output_parent_dir: results
+question_data_path: data/questions.csv
+init_pose_data_path: data/scene_init_poses.csv
+scene_data_path: /n/fs/llm-unc/hm3dsem-train
+
+# Camera, image
+camera_height: 1.5
+camera_tilt_deg: -30
+img_width: 640
+img_height: 480
+hfov: 120
