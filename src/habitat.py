@@ -57,6 +57,43 @@ def make_simple_cfg(settings):
 
     return habitat_sim.Configuration(sim_cfg, [agent_cfg])
 
+def make_semantic_cfg(settings):
+    # simulator backend
+    sim_cfg = habitat_sim.SimulatorConfiguration()
+    sim_cfg.scene_id = settings["scene"]
+    sim_cfg.scene_dataset_config_file = settings["scene_dataset_config_file"]
+    sim_cfg.load_semantic_mesh = True
+
+
+    # agent
+    agent_cfg = habitat_sim.agent.AgentConfiguration()
+
+    # In the 1st example, we attach only one sensor, a RGB visual sensor, to the agent
+    rgb_sensor_spec = habitat_sim.CameraSensorSpec()
+    rgb_sensor_spec.uuid = "color_sensor"
+    rgb_sensor_spec.sensor_type = habitat_sim.SensorType.COLOR
+    rgb_sensor_spec.resolution = [settings["height"], settings["width"]]
+    rgb_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
+    rgb_sensor_spec.hfov = settings["hfov"]
+
+    depth_sensor_spec = habitat_sim.CameraSensorSpec()
+    depth_sensor_spec.uuid = "depth_sensor"
+    depth_sensor_spec.sensor_type = habitat_sim.SensorType.DEPTH
+    depth_sensor_spec.resolution = [settings["height"], settings["width"]]
+    depth_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
+    depth_sensor_spec.hfov = settings["hfov"]
+
+    semantic_sensor_spec = habitat_sim.CameraSensorSpec()
+    semantic_sensor_spec.uuid = "semantic_sensor"
+    semantic_sensor_spec.sensor_type = habitat_sim.SensorType.SEMANTIC
+    semantic_sensor_spec.resolution = [settings["height"], settings["width"]]
+    semantic_sensor_spec.position = [0.0, settings["sensor_height"], 0.0]
+    semantic_sensor_spec.hfov = settings["hfov"]
+
+    agent_cfg.sensor_specifications = [rgb_sensor_spec, depth_sensor_spec, semantic_sensor_spec]
+
+    return habitat_sim.Configuration(sim_cfg, [agent_cfg])
+
 
 def merge_pointcloud(
     pts_orig, pts_new, clip_grads=None, new_clip_grads=None, threshold=1e-2

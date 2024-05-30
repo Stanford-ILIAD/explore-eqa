@@ -4,7 +4,9 @@ exp_name: vlm_exp
 output_parent_dir: results
 question_data_path: data/questions.csv
 init_pose_data_path: data/scene_init_poses.csv
-scene_data_path: /n/fs/llm-unc/hm3dsem-train
+scene_dataset_config_path: data/hm3d_annotated_basis.scene_dataset_config.json
+scene_data_path: data/test_scene
+semantic_bbox_data_path: data/
 save_obs: true
 save_freq: 10
 

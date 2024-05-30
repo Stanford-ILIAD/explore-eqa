@@ -132,6 +132,23 @@ class TSDFPlanner:
         )
 
         self.target_point = None
+        self.simple_scene_graph = {}
+
+    def increment_scene_graph(self, semantic_obs, gt_scene):
+        unique_semantic_ids = np.unique(semantic_obs)
+        for i in range(len(unique_semantic_ids)):
+            if unique_semantic_ids[i] not in self.simple_scene_graph.keys() and unique_semantic_ids[i] != 0:
+                items = [d for d in gt_scene if int(d["id"]) == int(unique_semantic_ids[i])]
+                if len(items) == 0:
+                    continue
+                if len(items[0]["class_name"]) in ["wall", "floor", "ceiling"]:
+                    continue
+                bbox = items[0]["bbox"]
+                x = (bbox[0][0] + bbox[1][0]) / 2
+                y = (bbox[0][1] + bbox[1][1]) / 2
+                z = (bbox[0][2] + bbox[1][2]) / 2
+                pt = np.dot((x, z, y), np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]))
+                self.simple_scene_graph[unique_semantic_ids[i]] = pt
 
     @staticmethod
     @njit(parallel=True)
@@ -518,6 +535,9 @@ class TSDFPlanner:
             for ax in [ax1, ax2]:
                 for point in candidates:
                     ax.scatter(point[1], point[0], c="g", s=30)
+                for point in self.simple_scene_graph.values():
+                    vox_point = self.world2vox(np.array(point))
+                    ax.scatter(vox_point[1], vox_point[0], c="w", s=30)
 
             # Convert to pixel coordinates
             if len(candidates) > 0:
