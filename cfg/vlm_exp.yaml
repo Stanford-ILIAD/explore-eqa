@@ -1,11 +1,11 @@
 # General
 seed: 42
-exp_name: vlm_exp
+exp_name: vlm_exp_frontiers
 output_parent_dir: results
 question_data_path: data/questions.csv
 init_pose_data_path: data/scene_init_poses.csv
 scene_dataset_config_path: data/hm3d_annotated_basis.scene_dataset_config.json
-scene_data_path: data/test_scene
+scene_data_path: data/train
 semantic_bbox_data_path: data/
 save_obs: true
 save_freq: 10
@@ -50,8 +50,8 @@ planner:
   min_dist_from_cur: 0.5
   max_dist_from_cur: 3
   frontier_spacing: 1.5
-  frontier_min_neighbors: 3
-  frontier_max_neighbors: 4
+  frontier_min_neighbors: 7
+  frontier_max_neighbors: 8
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
 
