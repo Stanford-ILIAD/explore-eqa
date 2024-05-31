@@ -156,6 +156,43 @@ def main(cfg):
             init_clearance=cfg.init_clearance * 2,
         )
 
+        # find an endpoint for the path
+        pts_end = None
+        path_points = None
+        max_try = 1000
+        try_count = 0
+        max_distance_history = -1
+        while True:
+            try_count += 1
+            if try_count > max_try:
+                break
+
+            pts_end_current = simulator.pathfinder.get_random_navigable_point()
+            if np.abs(pts_end_current[1] - pts[1]) > 0.4:  # make sure the end point is on the same level
+                continue
+
+            path = habitat_sim.ShortestPath()
+            path.requested_start = pts
+            path.requested_end = pts_end_current
+            found_path = simulator.pathfinder.find_path(path)
+            # geodesic_distance = path.geodesic_distance
+            # path_points = path.points  # list of points in the path
+            if found_path:
+                if path.geodesic_distance > max_distance_history:
+                    max_distance_history = path.geodesic_distance
+                    pts_end = pts_end_current
+                    path_points = path.points
+
+            if found_path and max_distance_history > 10:
+                break
+
+        assert pts_end is not None and path_points is not None
+        assert np.array_equal(path_points[0], np.asarray(pts, dtype=np.float32)) and np.array_equal(path_points[-1], pts_end)
+        # convert path points to normal
+        path_points = [pos_habitat_to_normal(p) for p in path_points]
+        # drop y coordinate
+        path_points = [p[:2] for p in path_points]
+
         # Run steps
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
         for cnt_step in range(num_step):
@@ -368,9 +405,10 @@ def main(cfg):
 
             # Determine next point
             if cnt_step < num_step:
-                pts_normal, angle, pts_pix, fig = tsdf_planner.find_next_pose(
+                pts_normal, angle, pts_pix, fig = tsdf_planner.find_next_pose_with_path(
                     pts=pts_normal,
                     angle=angle,
+                    path_points=path_points,
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )
