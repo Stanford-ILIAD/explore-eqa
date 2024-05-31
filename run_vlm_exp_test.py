@@ -101,7 +101,9 @@ def main(cfg):
 
         # Set data dir for this question - set initial data to be saved
         episode_data_dir = os.path.join(cfg.output_dir, str(question_ind))
+        episode_frontier_dir = os.path.join(cfg.frontier_dir, str(question_ind))
         os.makedirs(episode_data_dir, exist_ok=True)
+        os.makedirs(episode_frontier_dir, exist_ok=True)
         result = {"question_ind": question_ind}
 
         # Set up scene in Habitat
@@ -190,8 +192,6 @@ def main(cfg):
             masked_ids = np.unique(semantic_obs[depth > 3.0])
             semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
             tsdf_planner.increment_scene_graph(semantic_obs, semantic_data)
-            print(len(tsdf_planner.simple_scene_graph.keys()))
-
             if cfg.save_obs:
                 plt.imsave(
                     os.path.join(episode_data_dir, "{}.png".format(cnt_step)), rgb
@@ -298,12 +298,9 @@ def main(cfg):
                     )
 
                     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
-                        # print(rgb_im_draw)
+                        # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
                         width = 640
                         height = 480
-                        print(min(point_pix[0] - 0, width - point_pix[0]))
-                        print(min(point_pix[1] - 0, height - point_pix[1]))
                         size = 100
                         rgb_im_draw_cropped = rgb_im.crop(
                             (
@@ -376,6 +373,46 @@ def main(cfg):
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )
+                frontier_voxel_pts = [np.array(key) for key in tsdf_planner.frontiers.keys()]
+                frontier_world_pts = [
+                    frontier * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2] for frontier in frontier_voxel_pts
+                ]
+                # Turn to face each frontier point and get rgb image
+                print(f"Num Frontiers: {len(frontier_world_pts)}")
+                for i in range(len(frontier_world_pts)):
+                    frontier_pt = frontier_world_pts[i]
+                    # Turn to face the frontier point
+                    print(frontier_pt, pts)
+                    if tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] is not None:
+                        original_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])])
+                        if os.path.exists(original_path):
+                            target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
+                            os.system(f"cp {original_path} {target_path}")
+                    else:
+                        angle = np.arctan2(frontier_pt[1] - pts[1], frontier_pt[0] - pts[0])
+                        rotation = quat_to_coeffs(
+                            quat_from_angle_axis(angle, np.array([0, 1, 0]))
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                        agent_state.rotation = rotation
+                        agent.set_state(agent_state)
+                        # Get observation at current pose - skip black image, meaning robot is outside the floor
+                        obs = simulator.get_sensor_observations()
+                        rgb = obs["color_sensor"]
+                        plt.imsave(
+                            os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png"),
+                            rgb,
+                        )
+                        tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] = f"{cnt_step}_frontier_{i}.png"
+                        # rotate back to original angle
+                        angle = init_angle
+                        rotation = quat_to_coeffs(
+                            quat_from_angle_axis(angle, np.array([0, 1, 0]))
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                        agent_state.rotation = rotation
+                        agent.set_state(agent_state)
+
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
                 pts_normal = np.append(pts_normal, floor_height)
                 pts = pos_normal_to_habitat(pts_normal)
@@ -456,6 +493,9 @@ if __name__ == "__main__":
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
     if not os.path.exists(cfg.output_dir):
         os.makedirs(cfg.output_dir, exist_ok=True)  # recursive
+    cfg.frontier_dir = os.path.join(cfg.output_dir, "frontier")
+    if not os.path.exists(cfg.frontier_dir):
+        os.makedirs(cfg.frontier_dir, exist_ok=True)  # recursive
     logging_path = os.path.join(cfg.output_dir, "log.log")
     logging.basicConfig(
         level=logging.INFO,

@@ -134,6 +134,7 @@ class TSDFPlanner:
 
         self.target_point = None
         self.simple_scene_graph = {}
+        self.frontiers = {}
 
     def increment_scene_graph(self, semantic_obs, gt_scene):
         unique_semantic_ids = np.unique(semantic_obs)
@@ -642,6 +643,15 @@ class TSDFPlanner:
                 frontiers_new = np.append(frontiers_new, [center], axis=0)
             frontiers = frontiers_new.astype(int)
 
+        # remove keys in self.frontiers if not in frontiers
+        frontier_keys = [tuple(point) for point in frontiers]
+        for key in list(self.frontiers.keys()):
+            if key not in frontier_keys:
+                del self.frontiers[key]
+        for point in frontiers:
+            if tuple(point) not in self.frontiers.keys():
+                self.frontiers[tuple(point)] = None
+
         # subsample
         frontiers_weight = np.zeros((len(frontiers)))
 
@@ -832,6 +842,12 @@ class TSDFPlanner:
         ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
         ax1.set_title("Unoccupied")
         ax2.imshow(island)
+        for point in frontiers:
+            if self.frontiers[tuple(point)] is not None:
+                ax2.scatter(point[1], point[0], color="g", s=50, alpha=1)
+            else:
+                ax2.scatter(point[1], point[0], color="r", s=50, alpha=1)
+        ax2.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
         ax2.set_title("Island")
         ax3.imshow(unexplored_neighbors)
         for point in frontiers_pre_cluster:
@@ -841,9 +857,9 @@ class TSDFPlanner:
         for point in frontiers:
             ax4.scatter(point[1], point[0], color="white", s=20, alpha=1)
         fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
-        ax4.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
+        # ax4.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
         ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+        # ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
         ax4.quiver(
             next_point[1],
             next_point[0],
