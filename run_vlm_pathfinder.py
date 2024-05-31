@@ -38,6 +38,7 @@ from src.vlm import VLM
 from src.tsdf import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
 
+
 def main(cfg):
     camera_tilt = cfg.camera_tilt_deg * np.pi / 180
     img_height = cfg.img_height
@@ -85,7 +86,6 @@ def main(cfg):
         init_angle = init_pose_data[scene_floor]["init_angle"]
         logging.info(f"\n========\nIndex: {question_ind} Scene: {scene} Floor: {floor}")
         logging.info(f"Question: {question} Choices: {choices}, Answer: {answer}")
-
 
         ######
         # load semantic object bbox data
@@ -319,8 +319,6 @@ def main(cfg):
                             )
                         )
 
-                        
-
                     logging.info(f"Figure saved")
 
                     # # get VLM reasoning for exploring
@@ -430,7 +428,7 @@ def main(cfg):
         cnt_data += 1
         if cnt_data % cfg.save_freq == 0:
             with open(
-                os.path.join(cfg.output_dir, f"results_{cnt_data}.pkl"), "wb"
+                    os.path.join(cfg.output_dir, f"results_{cnt_data}.pkl"), "wb"
             ) as f:
                 pickle.dump(results_all, f)
 

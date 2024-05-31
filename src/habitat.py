@@ -64,7 +64,6 @@ def make_semantic_cfg(settings):
     sim_cfg.scene_dataset_config_file = settings["scene_dataset_config_file"]
     sim_cfg.load_semantic_mesh = True
 
-
     # agent
     agent_cfg = habitat_sim.agent.AgentConfiguration()
 
