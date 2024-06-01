@@ -169,6 +169,7 @@ def main(cfg):
         max_try = 1000
         try_count = 0
         max_distance_history = -1
+        # try to find a path that is long enough
         while True:
             try_count += 1
             if try_count > max_try:
@@ -182,8 +183,6 @@ def main(cfg):
             path.requested_start = pts
             path.requested_end = pts_end_current
             found_path = simulator.pathfinder.find_path(path)
-            # geodesic_distance = path.geodesic_distance
-            # path_points = path.points  # list of points in the path
             if found_path:
                 if path.geodesic_distance > max_distance_history:
                     max_distance_history = path.geodesic_distance
@@ -202,9 +201,10 @@ def main(cfg):
             quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
             * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
         ).tolist()
-        angle, axis = quat_to_angle_axis(
+        angle, axis = quat_to_angle_axis(  # overwrite the original angle with the new one that points along the path
             quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
         )
+        angle = angle if axis[1] > 0 else -angle
         # convert path points to normal
         path_points = [pos_habitat_to_normal(p) for p in path_points]
         # drop y coordinate
@@ -279,23 +279,6 @@ def main(cfg):
 
                 # Get VLM prediction
                 rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
-                # prompt_question = (
-                #     vlm_question
-                #     + "\nAnswer with the option's letter from the given choices directly."
-                # )
-                # logging.info(f"Prompt Pred: {prompt_text}")
-                # smx_vlm_pred = vlm.get_loss(
-                #     rgb_im, prompt_question, vlm_pred_candidates
-                # )
-                # smx_vlm_pred = np.ones((4)) / 4
-                # logging.info(f"Pred - Prob: {smx_vlm_pred}")
-
-                # Get VLM relevancy
-                # prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view?"
-                # # logging.info(f"Prompt Rel: {prompt_text}")
-                # # smx_vlm_rel = vlm.get_loss(rgb_im, prompt_rel, ["Yes", "No"])
-                # smx_vlm_rel = np.array([0.01, 0.99])
-                # logging.info(f"Rel - Prob: {smx_vlm_rel}")
 
                 # Get frontier candidates
                 prompt_points_pix = []
@@ -330,17 +313,6 @@ def main(cfg):
                     rgb_im_draw = rgb_im.copy()
                     draw = ImageDraw.Draw(rgb_im_draw)
                     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        # draw.ellipse(
-                        #     (
-                        #         point_pix[0] - cfg.visual_prompt.circle_radius,
-                        #         point_pix[1] - cfg.visual_prompt.circle_radius,
-                        #         point_pix[0] + cfg.visual_prompt.circle_radius,
-                        #         point_pix[1] + cfg.visual_prompt.circle_radius,
-                        #     ),
-                        #     fill=(200, 200, 200, 255),
-                        #     outline=(0, 0, 0, 255),
-                        #     width=3,
-                        # )
                         draw.text(
                             tuple(point_pix.astype(int).tolist()),
                             draw_letters[prompt_point_ind],
@@ -374,41 +346,6 @@ def main(cfg):
                         )
 
                     logging.info(f"Figure saved")
-
-                    # # get VLM reasoning for exploring
-                    # if cfg.use_lsv:
-                    #     prompt_lsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it.\nWhich direction (black letters on the image) would you explore then? Answer with a single letter."
-                    #     # logging.info(f"Prompt Exp: {prompt_text}")
-                    #     lsv = vlm.get_loss(
-                    #         rgb_im_draw,
-                    #         prompt_lsv,
-                    #         draw_letters[:actual_num_prompt_points],
-                    #     )
-                    #     lsv *= actual_num_prompt_points / 3
-                    # else:
-                    #     lsv = (
-                    #         np.ones(actual_num_prompt_points) / actual_num_prompt_points
-                    #     )
-
-                    # # base - use image without label
-                    # if cfg.use_gsv:
-                    #     prompt_gsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it. Is there any direction shown in the image worth exploring? Answer with Yes or No."
-                    #     # logging.info(f"Prompt Exp base: {prompt_gsv}")
-                    #     gsv = vlm.get_loss(rgb_im, prompt_gsv, ["Yes", "No"])[0]
-                    #     gsv = (
-                    #         np.exp(gsv / cfg.gsv_T) / cfg.gsv_F
-                    #     )  # scale before combined with lsv
-                    # else:
-                    #     gsv = 1
-                    # sv = lsv * gsv
-                    # logging.info(f"Exp - LSV: {lsv} GSV: {gsv} SV: {sv}")
-
-                    # # Integrate semantics only if there is any prompted point
-                    # tsdf_planner.integrate_sem(
-                    #     sem_pix=sv,
-                    #     radius=1.0,
-                    #     obs_weight=1.0,
-                    # )  # voxel locations already saved in tsdf class
 
                 # Save data
                 # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
