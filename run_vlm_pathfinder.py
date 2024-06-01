@@ -426,6 +426,7 @@ def main(cfg):
                     pts=pts_normal,
                     angle=angle,
                     path_points=path_points,
+                    pathfinder=pathfinder,
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )

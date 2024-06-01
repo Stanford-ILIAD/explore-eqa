@@ -44,6 +44,8 @@ from .geom import (
     run_dijkstra,
     fps,
 )
+from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
+import habitat_sim
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
 
@@ -583,344 +585,12 @@ class TSDFPlanner:
 
         return candidates_pix, fig
 
-    def find_next_pose(
-        self,
-        pts,
-        angle,
-        flag_no_val_weight=False,
-        unexplored_T=0.5,
-        unoccupied_T=3,
-        val_T=0.5,
-        val_dir_T=0.5,
-        dist_T=10,
-        min_dist_from_cur=0.5,
-        max_dist_from_cur=3,
-        frontier_spacing=1.5,
-        frontier_min_neighbors=3,
-        frontier_max_neighbors=4,
-        max_unexplored_check_frontier=3.0,
-        max_unoccupied_check_frontier=1.0,
-        max_val_check_frontier=5.0,
-        smooth_sigma=5,
-        eps=0.5,
-        **kwargs,
-    ):
-        """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
-        cur_point = self.world2vox(pts)
-        if hasattr(self, "cur_point"):
-            island = self.island
-            unoccupied, occupied = self.unoccupied, self.occupied
-            unexplored, unexplored_neighbors = (
-                self.unexplored,
-                self.unexplored_neighbors,
-            )
-        else:
-            island, unoccupied = self.get_island_around_pts(pts, height=0.4)
-            occupied = np.logical_not(unoccupied).astype(int)
-            unexplored = (np.sum(self._explore_vol_cpu, axis=-1) == 0).astype(int)
-            for point in self.init_points:
-                unexplored[point[0], point[1]] = 0
-            kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
-            unexplored_neighbors = ndimage.convolve(
-                unexplored, kernel, mode="constant", cval=0.0
-            )
-        self.unexplored_neighbors = unexplored_neighbors
-        self.unoccupied = unoccupied
-
-        # get semantic map by taking max over z
-        val_vol_2d = np.max(self._val_vol_cpu, axis=2).copy()
-
-        # smoothen the map
-        val_vol_2d = gaussian_filter(val_vol_2d, sigma=smooth_sigma)
-
-        # use nonzero_val_vol quantile for frontier normalization
-        frontiers = np.argwhere(
-            island
-            & (unexplored_neighbors >= frontier_min_neighbors)
-            & (unexplored_neighbors <= frontier_max_neighbors)
-        )
-        frontiers_pre_cluster = frontiers.copy()
-
-        # Fit frontiers
-        if len(frontiers) > 10:
-            db = DBSCAN(eps=eps, min_samples=2).fit(frontiers)
-            labels = db.labels_
-            # get one point from each cluster
-            frontiers_new = np.empty((0, 2))
-            for label in np.unique(labels):
-                if label == -1:
-                    continue
-                cluster = frontiers[labels == label]
-                # take the one that is closest to mean
-                dist = np.sqrt(
-                    (cluster[:, 0] - np.mean(cluster[:, 0])) ** 2
-                    + (cluster[:, 1] - np.mean(cluster[:, 1])) ** 2
-                )
-                center = cluster[np.argmin(dist)]
-                frontiers_new = np.append(frontiers_new, [center], axis=0)
-            frontiers = frontiers_new.astype(int)
-
-        # remove keys in self.frontiers if not in frontiers
-        frontier_keys = [tuple(point) for point in frontiers]
-        for key in list(self.frontiers.keys()):
-            if key not in frontier_keys:
-                del self.frontiers[key]
-        for point in frontiers:
-            if tuple(point) not in self.frontiers.keys():
-                self.frontiers[tuple(point)] = None
-
-        # subsample
-        frontiers_weight = np.zeros((len(frontiers)))
-
-        # Commit
-        point_type = "current"
-        if self.target_point is None:
-
-            # Get weights for frontiers
-            frontiers_weight = np.empty((0))
-            frontiers_new = np.empty((0, 2))
-            # start_time = time.time(
-            for point in frontiers:
-
-                # find normal into unexplored
-                normal = self.find_normal_into_space(point, unexplored, unexplored)
-
-                # Then check how much unoccupied in that direction
-                max_pixel_check = int(max_unoccupied_check_frontier / self._voxel_size)
-                dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
-                ).astype(int)
-                dir_pts = self.clip_2d_array(dir_pts)
-                unoccupied_rate = (
-                    np.sum(unoccupied[dir_pts[:, 0], dir_pts[:, 1]] == 1)
-                    / max_pixel_check
-                )
-
-                # Check the radio of unexplored in the direction, until hits obstacle
-                max_pixel_check = int(max_unexplored_check_frontier / self._voxel_size)
-                dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
-                ).astype(int)
-                dir_pts = self.clip_2d_array(dir_pts)
-                unexplored_rate = (
-                    np.sum(unexplored[dir_pts[:, 0], dir_pts[:, 1]] == 1)
-                    / max_pixel_check
-                )
-
-                # Check value in the direction
-                max_pixel_check = int(max_val_check_frontier / self._voxel_size)
-                dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
-                ).astype(int)
-                dir_pts = self.clip_2d_array(dir_pts)
-                val_vol_2d_dir = val_vol_2d[dir_pts[:, 0], dir_pts[:, 1]]
-                # keep non zero value only
-                val_vol_2d_dir = val_vol_2d_dir[val_vol_2d_dir > 0]
-                if len(val_vol_2d_dir) == 0:
-                    val = 0
-                else:
-                    val = np.mean(val_vol_2d_dir)
-
-                # Get weight - unexplored, unoccupied, and value
-                weight = np.exp(unexplored_rate / unexplored_T)  # [0-1] before T
-                weight *= np.exp(unoccupied_rate / unoccupied_T)  # [0-1] before T
-                if not flag_no_val_weight:
-                    weight *= np.exp(
-                        val_vol_2d[point[0], point[1]] / val_T
-                    )  # [0-1] before T
-                    weight *= np.exp(val / val_dir_T)  # [0-1] before T
-
-                # Check distance to current point - make weight very small if too close and aligned
-                dist = (
-                    np.sqrt(
-                        (cur_point[0] - point[0]) ** 2 + (cur_point[1] - point[1]) ** 2
-                    )
-                    * self._voxel_size
-                )
-                pts_angle = np.arctan2(normal[1], normal[0]) - np.pi / 2
-                weight *= np.exp(-dist / dist_T)
-                if (
-                    dist < min_dist_from_cur / self._voxel_size
-                    and np.abs(angle - pts_angle) < np.pi / 6
-                ):
-                    weight *= 1e-3
-
-                # Save weight
-                frontiers_weight = np.append(frontiers_weight, weight)
-                frontiers_new = np.concatenate((frontiers_new, [point]), axis=0)
-            frontiers = frontiers_new.astype(int)
-            logging.info(f"Number of frontiers for next pose: {len(frontiers)}")
-
-            # raise frontier value if there is frontier
-            if len(frontiers) > 0:
-                logging.info(
-                    f"Mean and std of frontier weight: {np.mean(frontiers_weight):.3f},"
-                    f" {np.std(frontiers_weight):.3f}"
-                )
-                point_type = "frontier"
-
-                # take best point until it satisfies condition
-                max_try = 50
-                cnt_try = 0
-                while 1:
-                    cnt_try += 1
-                    if cnt_try > max_try:
-                        point_type = "current"
-                        break
-                    frontiers_weight_red = frontiers_weight / np.mean(
-                        frontiers_weight
-                    )  # prevent overflowing
-                    frontier_ind = np.random.choice(
-                        range(len(frontiers)),
-                        p=frontiers_weight_red / np.sum(frontiers_weight_red),
-                    )
-                    logging.info(f"weight: {frontiers_weight[frontier_ind]:.3f}")
-                    max_point = frontiers[frontier_ind]
-
-                    # find the direction into unexplored
-                    direction = self.find_normal_into_space(
-                        max_point, unexplored, unexplored
-                    )
-
-                    # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
-                    # there is a chance that the point is outside the free space
-                    next_point = np.array(max_point, dtype=float)
-                    max_backtrack = int(frontier_spacing / self._voxel_size)
-                    min_backtrack = 2
-                    num_backtrack = 0
-                    while 1:
-                        next_point -= direction
-                        num_backtrack += 1
-                        if num_backtrack >= max_backtrack:
-                            break
-
-                        # break if close to boundary
-                        if not self.check_within_bnds(next_point):
-                            break
-
-                        # break if occupied
-                        if (
-                            occupied[int(next_point[0]), int(next_point[1])]
-                            or not island[int(next_point[0]), int(next_point[1])]
-                        ):
-                            next_point += 2 * direction
-                            break
-                    next_point = np.round(next_point).astype(int)
-                    if (
-                        num_backtrack >= min_backtrack
-                        and self.check_within_bnds(next_point)
-                        and island[int(next_point[0]), int(next_point[1])]
-                    ):
-                        break  # stop searching
-
-            # no patch used
-            if point_type == "current":
-                logging.info("No patches, return current point and random direction")
-                max_point = cur_point[:2]
-                next_point = cur_point[:2]
-                direction = np.random.rand(2) - 0.5
-                direction = direction / np.linalg.norm(direction)
-        else:
-            point_type = "commit"
-            next_point = self.target_point.copy()
-            direction = self.target_direction.copy()
-            max_point = self.max_point.copy()
-        logging.info(f"Next pose type: {point_type}")
-
-        # Check if the point is beyond the max dist. Note that not using dist from dijkstra for saving time, then not taking account into obstacles when calculating distance
-        dist = np.sqrt(
-            (next_point[0] - cur_point[0]) ** 2 + (next_point[1] - cur_point[1]) ** 2
-        )
-        if dist > max_dist_from_cur / self._voxel_size:
-            self.target_point = next_point.copy()
-            self.target_direction = direction.copy()
-            self.max_point = max_point.copy()
-
-            island_free = np.logical_not(island)  # 0 for free
-            path = run_dijkstra(island_free, cur_point, next_point)
-            max_num = min(int(max_dist_from_cur / self._voxel_size), len(path) - 1)
-            next_point = np.array(path[max_num])
-            direction = max_point - next_point  # direction to the max point
-            direction = direction / np.linalg.norm(direction)
-            logging.info(
-                f"Current {cur_point[:2]}, target {self.target_point}, move to"
-                f" {next_point}"
-            )
-        if dist <= max_dist_from_cur / self._voxel_size or max_num == len(path) - 1:
-            self.target_point = None
-            self.target_direction = None
-            self.max_point = None
-
-        # Plot
-        fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
-        agent_orientation = self.rad2vector(angle)
-        ax1.imshow(unoccupied)
-        ax1.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
-        ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
-        ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
-        ax1.set_title("Unoccupied")
-
-        ax2.imshow(island)
-        for point in frontiers:
-            if self.frontiers[tuple(point)] is not None:
-                ax2.scatter(point[1], point[0], color="g", s=50, alpha=1)
-            else:
-                ax2.scatter(point[1], point[0], color="r", s=50, alpha=1)
-        ax2.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax2.set_title("Island")
-
-        ax3.imshow(unexplored_neighbors)
-        for point in frontiers_pre_cluster:
-            ax3.scatter(point[1], point[0], color="white", s=20, alpha=1)
-        ax3.set_title("Unexplored neighbors")
-
-        im = ax4.imshow(val_vol_2d)
-        for point in frontiers:
-            ax4.scatter(point[1], point[0], color="white", s=20, alpha=1)
-            normal = self.find_normal_into_space(point, unexplored, unexplored)
-            dx, dy = normal * 4
-            ax4.arrow(point[1], point[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
-        fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
-        ax4.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
-        ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
-        ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
-        ax4.quiver(
-            next_point[1],
-            next_point[0],
-            direction[1],
-            direction[0],
-            color="r",
-            scale=5,
-            angles="xy",
-            alpha=0.2,
-        )
-        ax4.set_title("Current sem values")
-
-        im = ax5.imshow(island)
-        ax5.set_title("Path on island")
-
-        frontier_weights = np.zeros_like(val_vol_2d)
-        for point, weight in zip(frontiers, frontiers_weight):
-            frontier_weights[point[0], point[1]] = weight
-        im = ax6.imshow(frontier_weights)
-        fig.colorbar(im, orientation="vertical", ax=ax6, fraction=0.046, pad=0.04)
-        ax6.scatter(max_point[1], max_point[0], c="r", s=20, label="max")
-        ax6.set_title("Frontier weights")
-
-        # Convert back to world coordinates
-        next_point_normal = next_point * self._voxel_size + self._vol_origin[:2]
-
-        # Find the yaw angle again
-        next_yaw = np.arctan2(direction[1], direction[0]) - np.pi / 2
-        return next_point_normal, next_yaw, next_point, fig
-
     def find_next_pose_with_path(
         self,
         pts,
         angle,
         path_points,
+        pathfinder,
         flag_no_val_weight=False,
         unexplored_T=0.5,
         unoccupied_T=3,
@@ -1195,28 +865,58 @@ class TSDFPlanner:
         logging.info(f"Next pose type: {point_type}")
 
         # Check if the point is beyond the max dist. Note that not using dist from dijkstra for saving time, then not taking account into obstacles when calculating distance
-        dist = np.sqrt(
-            (next_point[0] - cur_point[0]) ** 2 + (next_point[1] - cur_point[1]) ** 2
-        )
-        if dist > max_dist_from_cur / self._voxel_size:
-            self.target_point = next_point.copy()
-            self.target_direction = direction.copy()
-            self.max_point = max_point.copy()
+        # dist = np.sqrt(
+        #     (next_point[0] - cur_point[0]) ** 2 + (next_point[1] - cur_point[1]) ** 2
+        # )
+        # if dist > max_dist_from_cur / self._voxel_size:
+        #     self.target_point = next_point.copy()
+        #     self.target_direction = direction.copy()
+        #     self.max_point = max_point.copy()
+        #
+        #     island_free = np.logical_not(island)  # 0 for free
+        #     path = run_dijkstra(island_free, cur_point, next_point)
+        #     max_num = min(int(max_dist_from_cur / self._voxel_size), len(path) - 1)
+        #     next_point = np.array(path[max_num])
+        #     direction = max_point - next_point  # direction to the max point
+        #     direction = direction / np.linalg.norm(direction)
+        #     logging.info(
+        #         f"Current {cur_point[:2]}, target {self.target_point}, move to"
+        #         f" {next_point}"
+        #     )
+        # if dist <= max_dist_from_cur / self._voxel_size or max_num == len(path) - 1:
+        #     self.target_point = None
+        #     self.target_direction = None
+        #     self.max_point = None
 
-            island_free = np.logical_not(island)  # 0 for free
-            path = run_dijkstra(island_free, cur_point, next_point)
-            max_num = min(int(max_dist_from_cur / self._voxel_size), len(path) - 1)
-            next_point = np.array(path[max_num])
-            direction = max_point - next_point  # direction to the max point
-            direction = direction / np.linalg.norm(direction)
-            logging.info(
-                f"Current {cur_point[:2]}, target {self.target_point}, move to"
-                f" {next_point}"
-            )
-        if dist <= max_dist_from_cur / self._voxel_size or max_num == len(path) - 1:
-            self.target_point = None
-            self.target_direction = None
-            self.max_point = None
+        # another check of the distance to next navigation point
+        dist, path_to_target = self.get_distance(cur_point[:2], next_point, pts[2], pathfinder)
+        if dist > max_dist_from_cur:
+            if path_to_target is not None:
+                # if the pathfinder find a path, then just walk along the path for max_dist_from_cur distance
+                dist_to_travel = max_dist_from_cur
+                for i in range(len(path_to_target) - 1):
+                    seg_length = np.linalg.norm(path_to_target[i + 1] - path_to_target[i])
+                    if seg_length < dist_to_travel:
+                        dist_to_travel -= seg_length
+                    else:
+                        # find the point on the segment according to the length ratio
+                        next_point_habitat = path_to_target[i] + (path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
+                        next_point = self.world2vox(pos_habitat_to_normal(next_point_habitat))[:2]
+                        break
+            else:
+                # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
+                walk_dir = next_point - cur_point[:2]
+                walk_dir = walk_dir / np.linalg.norm(walk_dir)
+                next_point = cur_point[:2] + (next_point - cur_point[:2]) * max_dist_from_cur / dist
+                # ensure next point is valid, otherwise go backward a bit
+                while (
+                    not self.check_within_bnds(next_point)
+                    or not island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
+                    or occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
+                ):
+                    next_point -= walk_dir * 0.3 / self._voxel_size
+                next_point = np.round(next_point).astype(int)
+
 
         # Plot
         fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
@@ -1470,7 +1170,25 @@ class TSDFPlanner:
     def rad2vector(angle):
         return np.array([-np.sin(angle), np.cos(angle)])
 
+    def get_distance(self, p1, p2, height, pathfinder):
+        # p1, p2 are in voxel space
+        # convert p1, p2 to habitat space
+        p1_world = p1 * self._voxel_size + self._vol_origin[:2]
+        p1_world = np.append(p1_world, height)
+        p1_habitat = pos_normal_to_habitat(p1_world)
+        p2_world = p2 * self._voxel_size + self._vol_origin[:2]
+        p2_world = np.append(p2_world, height)
+        p2_habitat = pos_normal_to_habitat(p2_world)
 
+        path = habitat_sim.ShortestPath()
+        path.requested_start = p1_habitat
+        path.requested_end = p2_habitat
+        found_path = pathfinder.find_path(path)
+
+        if found_path:
+            return path.geodesic_distance, path.points
+        else:
+            return np.linalg.norm(p1 - p2), None
 
 
 
