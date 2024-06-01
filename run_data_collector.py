@@ -63,6 +63,10 @@ def main(cfg):
             }
     logging.info(f"Loaded {len(questions_data)} questions.")
 
+    # Load VLM
+    # vlm = VLM(cfg.vlm)
+    vlm = None
+
     # Run all questions
     cnt_data = 0
     results_all = []
@@ -88,6 +92,12 @@ def main(cfg):
         with open(os.path.join(cfg.semantic_bbox_data_path, f"{scene}.json")) as f:
             semantic_data = json.load(f)
         ######
+
+        # Re-format the question to follow LLaMA style
+        # vlm_question = question
+        # vlm_pred_candidates = ["A", "B", "C", "D"]
+        # for token, choice in zip(vlm_pred_candidates, choices):
+        #     vlm_question += "\n" + token + "." + " " + choice
 
         # Set data dir for this question - set initial data to be saved
         episode_data_dir = os.path.join(cfg.dataset_output_dir, str(question_ind))
