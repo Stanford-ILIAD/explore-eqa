@@ -990,7 +990,17 @@ class TSDFPlanner:
                 (cluster[:, 0] - np.mean(cluster[:, 0])) ** 2
                 + (cluster[:, 1] - np.mean(cluster[:, 1])) ** 2
             )
-            center = cluster[np.argmin(dist)]
+            min_dist_rank = np.argsort(dist)
+            center = None
+            while True:
+                if len(min_dist_rank) == 0:
+                    break
+                center = cluster[min_dist_rank[0]]
+                if island[center[0], center[1]] and self.check_within_bnds(center):  # ensure the center is within the island
+                    break
+                min_dist_rank = min_dist_rank[1:]
+            if center is None:
+                continue
 
             if np.linalg.norm(center - cur_point[:2]) < 1e-3:
                 # skip the frontier if it is too near to the agent
@@ -1136,27 +1146,36 @@ class TSDFPlanner:
                     # there is a chance that the point is outside the free space
                     next_point = np.array(max_point.position, dtype=float)
                     max_backtrack = int(frontier_spacing / self._voxel_size)
-                    min_backtrack = 2
                     num_backtrack = 0
-                    while 1:
+                    best_clearance_backtrack_point = None
+                    best_clearance = 0
+                    clearance = 0
+                    # traverse all the backtrack points, and find the valid point with the largest clearance ahead
+                    while num_backtrack < max_backtrack:
                         next_point -= direction
                         num_backtrack += 1
 
-                        # break if occupied
-                        if (occupied[int(next_point[0]), int(next_point[1])]  # break if occupied
+                        # if the point is invalid
+                        if (occupied[int(next_point[0]), int(next_point[1])]
                             or not island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
-                            or not self.check_within_bnds(next_point)  # break if close to boundary
+                            or not self.check_within_bnds(next_point)  # out of bound of the map
                         ):
-                            next_point += min(2, num_backtrack) * direction
-                            break
+                            clearance = 0
+                            continue
+                        else:
+                            clearance += 1
+                            if clearance > best_clearance:
+                                best_clearance = clearance
+                                best_clearance_backtrack_point = next_point.copy()
+                    if best_clearance_backtrack_point is None:
+                        # all points backward are invalid
+                        # so just skip this frontier
+                        logging.info("All points backward are invalid, skip this frontier!!!!!")
+                        continue
 
-                        if num_backtrack >= max_backtrack:
-                            break
-
-                    next_point = np.round(next_point).astype(int)
+                    next_point = np.round(best_clearance_backtrack_point).astype(int)
                     if (
-                        num_backtrack >= min_backtrack
-                        and self.check_within_bnds(next_point)
+                        self.check_within_bnds(next_point)
                         and island[int(next_point[0]), int(next_point[1])]
                     ):
                         break  # stop searching

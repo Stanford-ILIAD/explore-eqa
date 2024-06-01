@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
-from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors
+from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
     make_simple_cfg,
     make_semantic_cfg,
@@ -190,18 +190,33 @@ def main(cfg):
                     pts_end = pts_end_current
                     path_points = path.points
 
-            if found_path and max_distance_history > 8:
+            if found_path and max_distance_history > 6:
                 break
 
         assert pts_end is not None and path_points is not None
         assert np.array_equal(path_points[0], np.asarray(pts, dtype=np.float32)) and np.array_equal(path_points[-1], pts_end)
+        init_orientation = path_points[1] - path_points[0]
+        init_orientation[1] = 0
+        # set the agent's orientation
+        rotation = quat_to_coeffs(
+            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
+            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+        ).tolist()
+        angle, axis = quat_to_angle_axis(
+            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
+        )
         # convert path points to normal
         path_points = [pos_habitat_to_normal(p) for p in path_points]
         # drop y coordinate
         path_points = [p[:2] for p in path_points]
 
-        # Run steps
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
+        # get the voxel coordinate of the init position
+        pts_voxel = pos_habitat_to_normal(pts)
+        pts_voxel = (pts_voxel[:2] - tsdf_planner._vol_origin[:2]) / tsdf_planner._voxel_size
+        pts_pixs = np.vstack((pts_pixs, pts_voxel))
+
+        # Run steps
         for cnt_step in range(num_step):
             logging.info(f"\n== step: {cnt_step}")
 
