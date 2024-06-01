@@ -4,6 +4,7 @@ Run EQA in Habitat-Sim with VLM exploration.
 """
 
 import os
+import random
 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -24,7 +25,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
-from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis
+from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
     make_simple_cfg,
     make_semantic_cfg,
@@ -38,11 +39,16 @@ from src.vlm import VLM
 from src.tsdf import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
 
+
 def main(cfg):
     camera_tilt = cfg.camera_tilt_deg * np.pi / 180
     img_height = cfg.img_height
     img_width = cfg.img_width
     cam_intr = get_cam_intr(cfg.hfov, img_height, img_width)
+
+    cfg.seed = np.random.randint(1000000)
+    random.seed(cfg.seed)
+    np.random.seed(cfg.seed)
 
     # Load dataset
     with open(cfg.question_data_path) as f:
@@ -76,7 +82,6 @@ def main(cfg):
         init_angle = init_pose_data[scene_floor]["init_angle"]
         logging.info(f"\n========\nIndex: {question_ind} Scene: {scene} Floor: {floor}")
         logging.info(f"Question: {question} Choices: {choices}, Answer: {answer}")
-
 
         ######
         # load semantic object bbox data
@@ -157,7 +162,58 @@ def main(cfg):
             init_clearance=cfg.init_clearance * 2,
         )
 
-        # Run steps
+        # find an endpoint for the path
+        pts_end = None
+        path_points = None
+        max_try = 1000
+        try_count = 0
+        max_distance_history = -1
+        while True:
+            try_count += 1
+            if try_count > max_try:
+                break
+
+            pts_end_current = simulator.pathfinder.get_random_navigable_point()
+            if np.abs(pts_end_current[1] - pts[1]) > 0.4:  # make sure the end point is on the same level
+                continue
+
+            path = habitat_sim.ShortestPath()
+            path.requested_start = pts
+            path.requested_end = pts_end_current
+            found_path = simulator.pathfinder.find_path(path)
+            # geodesic_distance = path.geodesic_distance
+            # path_points = path.points  # list of points in the path
+            if found_path:
+                if path.geodesic_distance > max_distance_history:
+                    max_distance_history = path.geodesic_distance
+                    pts_end = pts_end_current
+                    path_points = path.points
+
+            if found_path and max_distance_history > 6:
+                break
+
+        assert pts_end is not None and path_points is not None
+        assert np.array_equal(path_points[0], np.asarray(pts, dtype=np.float32)) and np.array_equal(path_points[-1], pts_end)
+        init_orientation = path_points[1] - path_points[0]
+        init_orientation[1] = 0
+        # set the agent's orientation
+        rotation = quat_to_coeffs(
+            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
+            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+        ).tolist()
+        angle, axis = quat_to_angle_axis(
+            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
+        )
+        # convert path points to normal
+        path_points = [pos_habitat_to_normal(p) for p in path_points]
+        # drop y coordinate
+        path_points = [p[:2] for p in path_points]
+
+        pts_pixs = np.empty((0, 2))  # for plotting path on the image
+        # get the voxel coordinate of the init position
+        pts_voxel = pos_habitat_to_normal(pts)
+        pts_voxel = (pts_voxel[:2] - tsdf_planner._vol_origin[:2]) / tsdf_planner._voxel_size
+        pts_pixs = np.vstack((pts_pixs, pts_voxel))
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
         for cnt_step in range(num_step):
 
@@ -237,32 +293,33 @@ def main(cfg):
             step_dict["frontiers"] = []
             # Determine next point
             if cnt_step < num_step:
-                pts_normal, angle, pts_pix, fig = tsdf_planner.find_next_pose(
+                pts_normal, angle, pts_pix, fig, path_points = tsdf_planner.find_next_pose_with_path(
                     pts=pts_normal,
                     angle=angle,
+                    path_points=path_points,
+                    pathfinder=pathfinder,
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )
-                frontier_voxel_pts = [np.array(key) for key in tsdf_planner.frontiers.keys()]
-                frontier_world_pts = [
-                    frontier * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2] for frontier in frontier_voxel_pts
-                ]
+
                 # Turn to face each frontier point and get rgb image
-                print(f"Num Frontiers: {len(frontier_world_pts)}")
-                for i in range(len(frontier_world_pts)):
+                print(f"Num Frontiers: {len(tsdf_planner.frontiers)}")
+                for i, frontier in enumerate(tsdf_planner.frontiers):
                     frontier_dict = {}
-                    frontier_pt = frontier_world_pts[i]
-                    frontier_dict["coordinate"] = frontier_pt.tolist()
+                    pos_voxel = frontier.position
+                    pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                    pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                    frontier_dict["coordinate"] = pos_world.tolist()
                     # Turn to face the frontier point
-                    if tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] is not None:
-                        frontier_dict["rgb_id"] = tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])]
+                    if frontier.image is not None:
+                        frontier_dict["rgb_id"] = frontier.image
                     else:
-                        frontier_angle = np.arctan2(frontier_pt[1] - pts[1], frontier_pt[0] - pts[0])
-                        rotation = quat_to_coeffs(
-                            quat_from_angle_axis(frontier_angle, np.array([0, 1, 0]))
+                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                        default_view_direction = np.asarray([0., 0., -1.])
+                        agent_state.rotation = quat_to_coeffs(
+                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
                             * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
                         ).tolist()
-                        agent_state.rotation = rotation
                         agent.set_state(agent_state)
                         # Get observation at current pose - skip black image, meaning robot is outside the floor
                         obs = simulator.get_sensor_observations()
@@ -271,16 +328,8 @@ def main(cfg):
                             os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
                             rgb,
                         )
-                        tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] = f"{cnt_step}_{i}.png"
+                        frontier.image = f"{cnt_step}_{i}.png"
                         frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"
-                        # rotate back to original angle
-                        angle = init_angle
-                        rotation = quat_to_coeffs(
-                            quat_from_angle_axis(angle, np.array([0, 1, 0]))
-                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                        ).tolist()
-                        agent_state.rotation = rotation
-                        agent.set_state(agent_state)
                     step_dict["frontiers"].append(frontier_dict)
                     ### We still need to save ground truth for every step here! ###
 
