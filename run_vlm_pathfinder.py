@@ -33,6 +33,7 @@ from src.habitat import (
     pos_habitat_to_normal,
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
+    get_quaternion
 )
 from src.geom import get_cam_intr, get_scene_bnds
 from src.vlm import VLM
@@ -142,10 +143,7 @@ def main(cfg):
         angle = init_angle
 
         # Floor - use pts height as floor height
-        rotation = quat_to_coeffs(
-            quat_from_angle_axis(angle, np.array([0, 1, 0]))
-            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-        ).tolist()
+        rotation = get_quaternion(angle, camera_tilt)
         pts_normal = pos_habitat_to_normal(pts)
         floor_height = pts_normal[-1]
         tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
@@ -220,142 +218,150 @@ def main(cfg):
         for cnt_step in range(num_step):
             logging.info(f"\n== step: {cnt_step}")
 
-            # Save step info and set current pose
-            step_name = f"step_{cnt_step}"
-            logging.info(f"Current pts: {pts}")
-            agent_state.position = pts
-            agent_state.rotation = rotation
-            agent.set_state(agent_state)
-            pts_normal = pos_habitat_to_normal(pts)
-            result[step_name] = {"pts": pts, "angle": angle}
+            angle_increment = cfg.extra_view_angle_deg * np.pi / 180
+            all_angles = [angle + angle_increment * i for i in range(-cfg.extra_view // 2, cfg.extra_view // 2 + 1)]
+            # let the main viewing angle be the last one to avoid potential overwriting problems
+            main_angle = all_angles.pop(cfg.extra_view // 2)
+            all_angles.append(main_angle)
 
-            # Update camera info
-            sensor = agent.get_state().sensor_states["depth_sensor"]
-            quaternion_0 = sensor.rotation
-            translation_0 = sensor.position
-            cam_pose = np.eye(4)
-            cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
-            cam_pose[:3, 3] = translation_0
-            cam_pose_normal = pose_habitat_to_normal(cam_pose)
-            cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
+            for view_idx, ang in enumerate(all_angles):
 
-            # Get observation at current pose - skip black image, meaning robot is outside the floor
-            obs = simulator.get_sensor_observations()
-            rgb = obs["color_sensor"]
-            depth = obs["depth_sensor"]
-            semantic_obs = obs["semantic_sensor"]
+                # Save step info and set current pose
+                step_name = f"step_{cnt_step}"
+                logging.info(f"Current pts: {pts}")
+                agent_state.position = pts
+                agent_state.rotation = get_quaternion(ang, camera_tilt)
+                agent.set_state(agent_state)
+                pts_normal = pos_habitat_to_normal(pts)
+                result[step_name] = {"pts": pts, "angle": angle}
 
-            # construct an frequency count map of each semantic id to a unique id
-            masked_ids = np.unique(semantic_obs[depth > 3.0])
-            semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
-            tsdf_planner.increment_scene_graph(semantic_obs, semantic_data)
-            if cfg.save_obs:
-                plt.imsave(
-                    os.path.join(episode_data_dir, "{}.png".format(cnt_step)), rgb
-                )
-                semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
-                semantic_img.putpalette(d3_40_colors_rgb.flatten())
-                semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
-                semantic_img = semantic_img.convert("RGBA")
-                semantic_img.save(
-                    os.path.join(episode_data_dir, "{}_semantic.png".format(cnt_step))
-                )
+                # Update camera info
+                sensor = agent.get_state().sensor_states["depth_sensor"]
+                quaternion_0 = sensor.rotation
+                translation_0 = sensor.position
+                cam_pose = np.eye(4)
+                cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
+                cam_pose[:3, 3] = translation_0
+                cam_pose_normal = pose_habitat_to_normal(cam_pose)
+                cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
 
-            num_black_pixels = np.sum(
-                np.sum(rgb, axis=-1) == 0
-            )  # sum over channel first
-            if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
+                # Get observation at current pose - skip black image, meaning robot is outside the floor
+                obs = simulator.get_sensor_observations()
+                rgb = obs["color_sensor"]
+                depth = obs["depth_sensor"]
+                semantic_obs = obs["semantic_sensor"]
 
-                # TSDF fusion
-                tsdf_planner.integrate(
-                    color_im=rgb,
-                    depth_im=depth,
-                    cam_intr=cam_intr,
-                    cam_pose=cam_pose_tsdf,
-                    obs_weight=1.0,
-                    margin_h=int(cfg.margin_h_ratio * img_height),
-                    margin_w=int(cfg.margin_w_ratio * img_width),
-                )
-
-                # Get VLM prediction
-                rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
-
-                # Get frontier candidates
-                prompt_points_pix = []
-                if cfg.use_active:
-                    prompt_points_pix, fig = (
-                        tsdf_planner.find_prompt_points_within_view(
-                            pts_normal,
-                            img_width,
-                            img_height,
-                            cam_intr,
-                            cam_pose_tsdf,
-                            **cfg.visual_prompt,
-                        )
+                # construct an frequency count map of each semantic id to a unique id
+                masked_ids = np.unique(semantic_obs[depth > 3.0])
+                semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
+                tsdf_planner.increment_scene_graph(semantic_obs, semantic_data)
+                if cfg.save_obs:
+                    plt.imsave(
+                        os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb
                     )
-                    fig.tight_layout()
-                    plt.savefig(
-                        os.path.join(
-                            episode_data_dir, "{}_prompt_points.png".format(cnt_step)
-                        )
-                    )
-                    plt.close()
-
-                # Visual prompting
-                draw_letters = ["1", "2", "3", "4"]  # always four
-                fnt = ImageFont.truetype(
-                    "data/Open_Sans/static/OpenSans-Regular.ttf",
-                    30,
-                )
-                actual_num_prompt_points = len(prompt_points_pix)
-                # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
-                if True:
-                    rgb_im_draw = rgb_im.copy()
-                    draw = ImageDraw.Draw(rgb_im_draw)
-                    for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        draw.text(
-                            tuple(point_pix.astype(int).tolist()),
-                            draw_letters[prompt_point_ind],
-                            font=fnt,
-                            fill=(255, 0, 0, 255),
-                            anchor="mm",
-                            font_size=15,
-                        )
-
-                    rgb_im_draw.save(
-                        os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
+                    semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
+                    semantic_img.putpalette(d3_40_colors_rgb.flatten())
+                    semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
+                    semantic_img = semantic_img.convert("RGBA")
+                    semantic_img.save(
+                        os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png")
                     )
 
-                    for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
-                        width = 640
-                        height = 480
-                        size = 100
-                        rgb_im_draw_cropped = rgb_im.crop(
-                            (
-                                max(point_pix[0] - size, 0),
-                                max(point_pix[1] - size, 0),
-                                min(point_pix[0] + size, width),
-                                min(point_pix[1] + size, height),
+                num_black_pixels = np.sum(
+                    np.sum(rgb, axis=-1) == 0
+                )  # sum over channel first
+                if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
+
+                    # TSDF fusion
+                    tsdf_planner.integrate(
+                        color_im=rgb,
+                        depth_im=depth,
+                        cam_intr=cam_intr,
+                        cam_pose=cam_pose_tsdf,
+                        obs_weight=1.0,
+                        margin_h=int(cfg.margin_h_ratio * img_height),
+                        margin_w=int(cfg.margin_w_ratio * img_width),
+                    )
+
+                    # Get VLM prediction
+                    rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
+
+                    # Get frontier candidates
+                    prompt_points_pix = []
+                    if cfg.use_active:
+                        prompt_points_pix, fig = (
+                            tsdf_planner.find_prompt_points_within_view(
+                                pts_normal,
+                                img_width,
+                                img_height,
+                                cam_intr,
+                                cam_pose_tsdf,
+                                **cfg.visual_prompt,
                             )
                         )
-                        rgb_im_draw_cropped.save(
+                        fig.tight_layout()
+                        plt.savefig(
                             os.path.join(
-                                episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
+                                episode_data_dir, "{}_prompt_points.png".format(cnt_step)
                             )
                         )
+                        plt.close()
 
-                    logging.info(f"Figure saved")
+                    # Visual prompting
+                    draw_letters = ["1", "2", "3", "4"]  # always four
+                    fnt = ImageFont.truetype(
+                        "data/Open_Sans/static/OpenSans-Regular.ttf",
+                        30,
+                    )
+                    actual_num_prompt_points = len(prompt_points_pix)
+                    # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
+                    if True:
+                        rgb_im_draw = rgb_im.copy()
+                        draw = ImageDraw.Draw(rgb_im_draw)
+                        for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                            draw.text(
+                                tuple(point_pix.astype(int).tolist()),
+                                draw_letters[prompt_point_ind],
+                                font=fnt,
+                                fill=(255, 0, 0, 255),
+                                anchor="mm",
+                                font_size=15,
+                            )
 
-                # Save data
-                # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
-                # result[step_name]["smx_vlm_rel"] = smx_vlm_rel
-                result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
-            else:
-                logging.info("Skipping black image!")
-                result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+                        rgb_im_draw.save(
+                            os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
+                        )
+
+                        for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                            # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
+                            width = 640
+                            height = 480
+                            size = 100
+                            rgb_im_draw_cropped = rgb_im.crop(
+                                (
+                                    max(point_pix[0] - size, 0),
+                                    max(point_pix[1] - size, 0),
+                                    min(point_pix[0] + size, width),
+                                    min(point_pix[1] + size, height),
+                                )
+                            )
+                            rgb_im_draw_cropped.save(
+                                os.path.join(
+                                    episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
+                                )
+                            )
+
+                        logging.info(f"Figure saved")
+
+                    # Save data
+                    # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
+                    # result[step_name]["smx_vlm_rel"] = smx_vlm_rel
+                    result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
+                    result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+                else:
+                    logging.info("Skipping black image!")
+                    result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
+                    result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
 
             # Determine next point
             if cnt_step < num_step:

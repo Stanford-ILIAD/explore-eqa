@@ -31,6 +31,8 @@ init_clearance: 0.5
 max_step_room_size_ratio: 3
 black_pixel_ratio: 0.5
 min_random_init_steps: 2
+extra_view: 2
+extra_view_angle_deg: 120
 
 # Semantic map
 use_active: true
