@@ -305,7 +305,45 @@ def main(cfg):
                                 episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
                             )
                         )
+
+                        
+
                     logging.info(f"Figure saved")
+
+                    # # get VLM reasoning for exploring
+                    # if cfg.use_lsv:
+                    #     prompt_lsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it.\nWhich direction (black letters on the image) would you explore then? Answer with a single letter."
+                    #     # logging.info(f"Prompt Exp: {prompt_text}")
+                    #     lsv = vlm.get_loss(
+                    #         rgb_im_draw,
+                    #         prompt_lsv,
+                    #         draw_letters[:actual_num_prompt_points],
+                    #     )
+                    #     lsv *= actual_num_prompt_points / 3
+                    # else:
+                    #     lsv = (
+                    #         np.ones(actual_num_prompt_points) / actual_num_prompt_points
+                    #     )
+
+                    # # base - use image without label
+                    # if cfg.use_gsv:
+                    #     prompt_gsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it. Is there any direction shown in the image worth exploring? Answer with Yes or No."
+                    #     # logging.info(f"Prompt Exp base: {prompt_gsv}")
+                    #     gsv = vlm.get_loss(rgb_im, prompt_gsv, ["Yes", "No"])[0]
+                    #     gsv = (
+                    #         np.exp(gsv / cfg.gsv_T) / cfg.gsv_F
+                    #     )  # scale before combined with lsv
+                    # else:
+                    #     gsv = 1
+                    # sv = lsv * gsv
+                    # logging.info(f"Exp - LSV: {lsv} GSV: {gsv} SV: {sv}")
+
+                    # # Integrate semantics only if there is any prompted point
+                    # tsdf_planner.integrate_sem(
+                    #     sem_pix=sv,
+                    #     radius=1.0,
+                    #     obs_weight=1.0,
+                    # )  # voxel locations already saved in tsdf class
 
                 # Save data
                 # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
