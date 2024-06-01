@@ -353,6 +353,7 @@ def main(cfg):
 
                     # generate a random question id
                     question_id = f'{scene_path.split("/")[-1]}_{rare_obj_id}_{rare_class}_{random.randint(0, 1000000)}'
+                    question_id = question_id.replace(' ', '_')
 
                     # save the observation image
                     img_save_path = os.path.join(cfg.save_dir, f"{question_id}.png")
