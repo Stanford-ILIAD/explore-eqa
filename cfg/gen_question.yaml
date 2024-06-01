@@ -1,0 +1,44 @@
+# about data
+dataset_path: '/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d'
+scene_dataset_config_file: '/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
+bounding_box_dir: '/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged'
+train_floor_data_path: "data/scene_floor_heights_train.pkl"
+val_floor_data_path: "data/scene_floor_heights_val.pkl"
+fewshot_example_dir: 'data/fewshot_examples'
+save_dir: 'generated_questions'
+
+# about scene filtering
+num_distance_range: 4
+min_clearance: 0.1
+min_observe_radius: 1.5
+max_observe_radius: 3.0
+max_rare_class_num: 2  # The rare class should have only 1 object in the whole house
+
+min_rare_obj_pix_percentage: 0.01  # The rare object should account for at least 1% of the image to be counted
+max_rare_obj_pix_percentage: 0.06  # The rare object should account for at most 6% of the image to be counted
+min_observe_distance_ratio: 1.5  # Observe distance should be at least 1.5 times the object's size
+
+min_avg_depth_initial: 0.5  # if average depth is smaller than this value, skip the scene
+
+# about generating questions
+n_shot_positive: 4
+n_shot_negative: 4
+
+# about camera
+camera_height: 1.2
+img_width: 1280
+img_height: 1280
+hfov: 100
+
+
+
+
+
+
+
+
+
+
+
+
+

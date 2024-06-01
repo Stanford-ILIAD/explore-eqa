@@ -1,0 +1,48 @@
+[
+    {
+        "exist": true,
+        "file": "351_printer.png",
+        "reference_object": "printer",
+        "question": "What can I use to print my documents?",
+        "answer": "The printer on the wooden table."
+    },
+    {
+        "exist": true,
+        "file": "424_piano.png",
+        "reference_object": "piano",
+        "question": "What can I use to play some music?",
+        "answer": "The piano."
+    },
+    {
+        "exist": true,
+        "file": "468_refrigerator.png",
+        "reference_object": "refrigerator",
+        "question": "What can I use to keep my food cold?",
+        "answer": "The refrigerator in the kitchen."
+    },
+    {
+        "exist": true,
+        "file": "579_vaccume cleaner.png",
+        "reference_object": "vaccume cleaner",
+        "question": "What can I use to clean up the dirt and dust on the floor?",
+        "answer": "The vaccume cleaner in the basement."
+    },
+    {
+        "exist": false,
+        "file": "428_armchair.png",
+        "reference_object": "armchair",
+        "explanation": "The main function of an armchair is to sit, but there are other objects that can be used to sit in the room as well, such as a sofa or a stool. Therefore, the armchair is not unique enough for functional reasoning tasks."
+    },
+    {
+        "exist": false,
+        "file": "860_flag.png",
+        "reference_object": "flag",
+        "explanation": "There is no explicit function for a flag, especially in the household context."
+    },
+    {
+        "exist": false,
+        "file": "928_saw.png",
+        "reference_object": "saw",
+        "explanation": "The image quality is too low, and the saw in the image is too ambiguous to be recognized."
+    }
+]

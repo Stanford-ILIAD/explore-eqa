@@ -1,0 +1,43 @@
+[
+    {
+        "exist": true,
+        "file": "592_storage box.png",
+        "reference_object": "storage box",
+        "question": "Is the purple storage box under the rack that filled with boxes and bags in the basement empty?",
+        "answer": "No."
+    },
+    {
+        "exist": true,
+        "file": "485_worktop.png",
+        "reference_object": "worktop",
+        "question": "Is the worktop in the kitchen clean?",
+        "answer": "Yes."
+    },
+    {
+        "exist": true,
+        "file": "340_sofa.png",
+        "reference_object": "sofa",
+        "question": "Is the floor lamp next to the sofa in the living room turned on?",
+        "answer": "Yes."
+    },
+    {
+        "exist": true,
+        "file": "468_refrigerator.png",
+        "reference_object": "refrigerator",
+        "question": "Is the door of the refrigerator in the kitchen closed?",
+        "answer": "Yes."
+    },
+    {
+        "exist": false,
+        "file": "699_electrical device.png",
+        "reference_object": "electrical device",
+        "explanation": "This is a static image, so we cannot judge whether the electrical device is on or off. Meanwhile, there is no other salient state of the electrical device that can be used to ask a question."
+    },
+    {
+        "exist": false,
+        "file": "670_desk.png",
+        "reference_object": "desk",
+        "explanation": "The image quality is too low, and the desk is too ambiguous to be identified."
+    }
+
+]

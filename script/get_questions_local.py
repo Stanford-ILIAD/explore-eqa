@@ -21,62 +21,21 @@ from script.background_prompts import background_prompts
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors
 
 
-if __name__ == "__main__":
-    dataset_path = '/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d'
+def main(cfg):
+    # scene_list = ['00800-TEEsavR23oF']
     scene_list = ['00324-DoSbsoo4EAg', '00606-W16Bm4ysK8v', '00669-DNWbUAJYsPy']
-    scene_dataset_config_file = '/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
-    bounding_box_dir = '/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged'
-    train_floor_data_path = "data/scene_floor_heights_train.pkl"
-    val_floor_data_path = "data/scene_floor_heights_val.pkl"
-    save_dir = 'generated_questions'
-    os.makedirs(save_dir, exist_ok=True)
-    fewshot_example_dir = 'fewshot_examples'
-    # question_categories = ['object_recognition', 'object_state_recognition', 'attribute_recognition',
-    #                        'functional_reasoning', 'object_localization', 'world_knowledge', 'spatial_understanding']
-    question_categories = ['functional_reasoning']
+    question_categories = ['object_recognition', 'object_state_recognition', 'attribute_recognition',
+                           'functional_reasoning', 'object_localization', 'spatial_understanding']
     sys_prompt = "You are a helpful assistant."
 
-    # set up logging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(message)s",
-        handlers=[
-            logging.FileHandler(os.path.join(save_dir, "generate_qa_local_output.txt"), mode="w"),
-            logging.StreamHandler(),
-        ],
-    )
-
-    # about scene filtering
-    num_distance_range = 4
-    min_clearance = 0.1
-    min_observe_radius = 1.5
-    max_observe_radius = 3.0
-    max_rare_class_num = 2  # The rare class should have only 1 object in the whole house
-    min_obj_pix_ratio = 1e-5  # The object should account for at least 1e-5 of the image to be counted
-
-    min_rare_obj_pix_percentage = 0.01  # The rare object should account for at least 1% of the image to be counted
-    max_rare_obj_pix_percentage = 0.06  # The rare object should account for at most 6% of the image to be counted
-    min_observe_distance_ratio = 1.5  # Observe distance should be at least 1.5 times the object's size
-
-    # about generating questions
-    n_shot_positive = 4
-    n_shot_negative = 4
-
-    # about camera
-    seed = 42
-    camera_height = 1.2
-    camera_tilt = 0
-    img_width = 1280
-    img_height = 1280
-    hfov = 100
-    hfov_rad = hfov * np.pi / 180
-    vfov_rad = 2 * np.arctan(np.tan(hfov_rad / 2) * img_height / img_width)
-    fx = (1.0 / np.tan(hfov_rad / 2.0)) * img_width / 2.0
-    fy = (1.0 / np.tan(vfov_rad / 2.0)) * img_height / 2.0
-    cx = img_width // 2
-    cy = img_height // 2
+    # setup camera
+    hfov_rad = cfg.hfov * np.pi / 180
+    vfov_rad = 2 * np.arctan(np.tan(hfov_rad / 2) * cfg.img_height / cfg.img_width)
+    fx = (1.0 / np.tan(hfov_rad / 2.0)) * cfg.img_width / 2.0
+    fy = (1.0 / np.tan(vfov_rad / 2.0)) * cfg.img_height / 2.0
+    cx = cfg.img_width // 2
+    cy = cfg.img_height // 2
     cam_intr = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-    min_avg_depth_initial = 0.5  # smaller than before
 
     client = AzureOpenAI(
         azure_endpoint='https://yuncong.openai.azure.com',
@@ -88,9 +47,9 @@ if __name__ == "__main__":
     for scene_name in scene_list:
         scene_id = int(scene_name.split('-')[0])
         if scene_id < 800:
-            scene_path_list.append(os.path.join(dataset_path, 'train', scene_name))
+            scene_path_list.append(os.path.join(cfg.dataset_path, 'train', scene_name))
         else:
-            scene_path_list.append(os.path.join(dataset_path, 'val', scene_name))
+            scene_path_list.append(os.path.join(cfg.dataset_path, 'val', scene_name))
 
     # traverse each scene
     for scene_path in scene_path_list:
@@ -111,14 +70,14 @@ if __name__ == "__main__":
         sim_settings = {
             "scene": scene_mesh_dir,
             "default_agent": 0,
-            "sensor_height": camera_height,
-            "width": img_width,
-            "height": img_height,
-            "hfov": hfov,
-            "scene_dataset_config_file": scene_dataset_config_file,
+            "sensor_height": cfg.camera_height,
+            "width": cfg.img_width,
+            "height": cfg.img_height,
+            "hfov": cfg.hfov,
+            "scene_dataset_config_file": cfg.scene_dataset_config_file,
         }
-        cfg = make_simple_cfg(sim_settings)
-        simulator = habitat_sim.Simulator(cfg)
+        sim_config = make_simple_cfg(sim_settings)
+        simulator = habitat_sim.Simulator(sim_config)
 
         scene = simulator.semantic_scene
         logging.info(f"Scene loaded: {scene_name}")
@@ -145,16 +104,16 @@ if __name__ == "__main__":
             if class_name not in class_to_object:
                 class_to_object[class_name] = []
             class_to_object[class_name].append(obj_id)
-        rare_class_list = [key for key in class_to_object if 0 < len(class_to_object[key]) <= max_rare_class_num]
+        rare_class_list = [key for key in class_to_object if 0 < len(class_to_object[key]) <= cfg.max_rare_class_num]
         rare_class_list.remove('unannotated')
         logging.info(f'Rare classes: {rare_class_list}')
 
         # load the floor data
         scene_id = int(scene_path.split("/")[-1].split("-")[0])
         if scene_id < 800:
-            floor_data_path = train_floor_data_path
+            floor_data_path = cfg.train_floor_data_path
         else:
-            floor_data_path = val_floor_data_path
+            floor_data_path = cfg.val_floor_data_path
         with open(floor_data_path, "rb") as f:
             scene_floor_data = pickle.load(f)
         # get floors from points data
@@ -164,17 +123,17 @@ if __name__ == "__main__":
 
         # Load the navigable maps
         pathfinder = simulator.pathfinder
-        pathfinder.seed(seed)
+        # pathfinder.seed(seed)
         pathfinder.load_nav_mesh(navmesh_file)
         agent = simulator.initialize_agent(sim_settings["default_agent"])
         agent_state = habitat_sim.AgentState()
 
         # load bounding box data
-        bounding_box_data = json.load(open(os.path.join(bounding_box_dir, scene_path.split("/")[-1] + ".json"), "r"))
+        bounding_box_data = json.load(open(os.path.join(cfg.bounding_box_dir, scene_path.split("/")[-1] + ".json"), "r"))
         object_id_to_bbox = {int(item['id']): item['bbox'] for item in bounding_box_data}
 
         # load generated questions save file
-        generated_questions_save_file = os.path.join(save_dir, f"generated_questions.json")
+        generated_questions_save_file = os.path.join(cfg.save_dir, f"generated_questions.json")
         if os.path.exists(generated_questions_save_file):
             generated_question_list = json.load(open(generated_questions_save_file, "r"))
             logging.info(f'Loaded {len(generated_question_list)} previously generated questions')
@@ -205,9 +164,9 @@ if __name__ == "__main__":
                 object_length = np.max(np.abs(obj_bbox[0] - obj_bbox[1]))
 
                 valid_observations_all = []  # store valid observations for all distances
-                for cnt_view in range(num_distance_range):
+                for cnt_view in range(cfg.num_distance_range):
                     # calculate the observe radius
-                    observe_radius = min_observe_radius + (max_observe_radius - min_observe_radius) * cnt_view / (num_distance_range - 1)
+                    observe_radius = cfg.min_observe_radius + (cfg.max_observe_radius - cfg.min_observe_radius) * cnt_view / (cfg.num_distance_range - 1)
 
                     max_try = 100
                     count_try = 0
@@ -240,12 +199,12 @@ if __name__ == "__main__":
                             continue
 
                         # check sufficient clearance
-                        if pathfinder.distance_to_closest_obstacle(pts) < min_clearance:  # was 0.1
+                        if pathfinder.distance_to_closest_obstacle(pts) < cfg.min_clearance:  # was 0.1
                             logging.debug(f'{rare_obj_id}-{rare_class}-{count_try}: Not enough clearance!')
                             continue
 
                         # get viewing direction: towards the object
-                        viewing_direction = obj_bbox_center - np.asarray([pts[0], camera_height + pts[1], pts[2]])
+                        viewing_direction = obj_bbox_center - np.asarray([pts[0], cfg.camera_height + pts[1], pts[2]])
                         default_direction = np.array([0.0, 0.0, -1.0])
                         intermediate_direction = viewing_direction.copy()
                         intermediate_direction[1] = 0.0
@@ -265,7 +224,7 @@ if __name__ == "__main__":
                         # filter out observations with too many black pixels
                         rgb = obs["color_sensor"]  # (H, W, 4), uint8
                         num_black_pixels = np.sum(rgb == 0)
-                        if num_black_pixels > 0.1 * img_width * img_height:
+                        if num_black_pixels > 0.1 * cfg.img_width * cfg.img_height:
                             logging.debug(f'{rare_obj_id}-{rare_class}-{count_try}: Too many black pixels!')
                             continue
                         depth = obs["depth_sensor"]  # (H, W), float32
@@ -275,7 +234,7 @@ if __name__ == "__main__":
                         if (
                                 # check zero-size array
                                 depth_filtered.size == 0
-                                or np.mean(depth_filtered) < min_avg_depth_initial
+                                or np.mean(depth_filtered) < cfg.min_avg_depth_initial
                                 # or np.max(depth_filtered) < min_depth_initial
                                 or -np.percentile(-depth_filtered, 80) < 0.5
                         ):  # 20% quantile is too small
@@ -283,14 +242,14 @@ if __name__ == "__main__":
                             continue
 
                         # get the number of occupied pixel of this rare object
-                        rare_obj_pix_ratio = np.sum(obs["semantic"] == rare_obj_id) / (img_width * img_height)
+                        rare_obj_pix_ratio = np.sum(obs["semantic"] == rare_obj_id) / (cfg.img_width * cfg.img_height)
 
 
                         ######################################
                         # do filtering
                         select_current_view = False
-                        if min_rare_obj_pix_percentage < rare_obj_pix_ratio < max_rare_obj_pix_percentage:
-                            if actual_distance > min_observe_distance_ratio * object_length:
+                        if cfg.min_rare_obj_pix_percentage < rare_obj_pix_ratio < cfg.max_rare_obj_pix_percentage:
+                            if actual_distance > cfg.min_observe_distance_ratio * object_length:
                                 select_current_view = True
 
                         if not select_current_view:
@@ -326,7 +285,7 @@ if __name__ == "__main__":
                     prompt_bg = background_prompts[question_category]
                     content = [{"type": "text", "text": prompt_bg}]
 
-                    fewshot_data_dir = os.path.join(fewshot_example_dir, question_category)
+                    fewshot_data_dir = os.path.join(cfg.fewshot_example_dir, question_category)
                     fewshot_examples = json.load(open(os.path.join(fewshot_data_dir, 'questions.json'), "r"))
 
                     # load positive examples
@@ -358,7 +317,7 @@ if __name__ == "__main__":
                         content += [{"type": "text", "text": fewshot_prompt}]
 
                         positive_example_count += 1
-                        if positive_example_count >= n_shot_positive:
+                        if positive_example_count >= cfg.n_shot_positive:
                             break
 
                     # load negative examples
@@ -389,14 +348,14 @@ if __name__ == "__main__":
                         content += [{"type": "text", "text": fewshot_prompt}]
 
                         negative_example_count += 1
-                        if negative_example_count >= n_shot_negative:
+                        if negative_example_count >= cfg.n_shot_negative:
                             break
 
                     # generate a random question id
                     question_id = f'{scene_path.split("/")[-1]}_{rare_obj_id}_{rare_class}_{random.randint(0, 1000000)}'
 
                     # save the observation image
-                    img_save_path = os.path.join(save_dir, f"{question_id}.png")
+                    img_save_path = os.path.join(cfg.save_dir, f"{question_id}.png")
                     Image.fromarray(reference_img).save(img_save_path)
 
                     view_base_64_image = encode_image(img_save_path)
@@ -439,6 +398,7 @@ if __name__ == "__main__":
                     except Exception as e:
                         logging.info(f"Error: {e}")
 
+                    generate_success = False
                     if output is not None:
                         if "Question: " in output and "Answer: " in output:
                             gen_question = output.split("Question: ")[1].split('Answer: ')[0].strip()
@@ -450,8 +410,10 @@ if __name__ == "__main__":
                                 "category": question_category.replace('_', ' '),
                                 "question": gen_question,
                                 "answer": gen_answer,
-                                "object_id": rare_obj_id,
-                                "class": rare_class
+                                "object_id": valid_observation["rare_obj_id"],
+                                "class": valid_observation["rare_class"],
+                                "position": valid_observation["position"].tolist(),
+                                "rotation": valid_observation["rotation"],
                             }
                             logging.info(f'Cateogry: {question_category}\nQuestion: {gen_question}\nAnswer: {gen_answer}')
 
@@ -471,25 +433,52 @@ if __name__ == "__main__":
                                 "category": question_category.replace('_', ' '),
                                 "question": "Not proper to generate a question",
                                 "answer": gen_explanation,
-                                "object_id": rare_obj_id,
-                                "class": rare_class
+                                "object_id": valid_observation["rare_obj_id"],
+                                "class": valid_observation["rare_class"],
+                                "position": valid_observation["position"].tolist(),
+                                "rotation": valid_observation["rotation"],
                             }
                             logging.info(f'Cateogry: {question_category}\nCannot generate question\nExplanation: {gen_explanation}')
 
-                            generated_question_list.append(generated_question)
-
-                            # save the generated question
-                            with open(generated_questions_save_file, "w") as f:
-                                json.dump(generated_question_list, f, indent=4)
+                            # generated_question_list.append(generated_question)
+                            #
+                            # # save the generated question
+                            # with open(generated_questions_save_file, "w") as f:
+                            #     json.dump(generated_question_list, f, indent=4)
 
                         else:
                             logging.info(f"Invalid output for GPT: {output}")
                     else:
                         logging.info(f"Error in generating question for {rare_obj_id}-{rare_class}!")
 
+                    if not generate_success:
+                        os.system(f"rm {img_save_path}")
 
 
 
+if __name__ == "__main__":
+    import argparse
+    from omegaconf import OmegaConf
+
+    # get config path
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
+    args = parser.parse_args()
+    cfg = OmegaConf.load(args.cfg_file)
+    OmegaConf.resolve(cfg)
+
+    os.makedirs(cfg.save_dir, exist_ok=True)
+    logging_path = os.path.join(cfg.save_dir, "log.log")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        handlers=[
+            logging.FileHandler(logging_path, mode="w"),
+            logging.StreamHandler(),
+        ],
+    )
+
+    main(cfg)
 
 
 

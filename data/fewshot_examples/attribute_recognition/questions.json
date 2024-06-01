@@ -1,0 +1,42 @@
+[
+    {
+        "exist": true,
+        "file": "425_piano bench.png",
+        "reference_object": "piano bench",
+        "question": "What material is the piano bench that is below three green paintings made of?",
+        "answer": "Wood."
+    },
+    {
+        "exist": true,
+        "file": "427_armchair.png",
+        "reference_object": "armchair",
+        "question": "What is the texture pattern of the armchair that is near the piano and a decorative plant?",
+        "answer": "The pattern is a realistic representation of leopard spots, consisting of black and brown markings on a lighter background"
+    },
+    {
+        "exist": true,
+        "file": "589_backpack.png",
+        "reference_object": "backpack",
+        "question": "What is the color of the backpack that leans against the storage rack full of boxes in the basement?",
+        "answer": "Black and red."
+    },
+    {
+        "exist": true,
+        "file": "433_bench.png",
+        "reference_object": "bench",
+        "question": "What is the shape of the mirror above the bench that nears the staircase?",
+        "answer": "It is in rectangular shape."
+    },
+    {
+        "exist": false,
+        "file": "670_desk.png",
+        "reference_object": "desk",
+        "explanation": "The image quality of the desk is too low to be recognized."
+    },
+    {
+        "exist": false,
+        "file": "763_food.png",
+        "reference_object": "food",
+        "explanation": "There is not a specific and salient attribute of food in the image."
+    }
+]

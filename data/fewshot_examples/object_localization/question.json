@@ -1,0 +1,42 @@
+[
+    {
+        "exist": true,
+        "file": "338_footrest.png",
+        "reference_object": "footrest",
+        "question": "Where is the footrest?",
+        "answer": "The footrest is in the living room, between the two sofas and the fireplace."
+    },
+    {
+        "exist": false,
+        "file": "390_board games.png",
+        "reference_object": "board games", 
+        "explanation": "The view in the image is too close to the board games, so there is not enough inforation to describe the global location of the board games in the room."
+    },
+    {
+        "exist": true,
+        "file": "515_board.png",
+        "reference_object": "board",
+        "question": "Where is the chalk board hanging on the wall?",
+        "answer": "The chalk board is hung on the pillow near the stairs next to the kitchen."
+    },
+    {
+        "exist": true,
+        "file": "592_storage box.png",
+        "reference_object": "storage box",
+        "question": "Where is the purple storage box in the basement?",
+        "answer": "It is under a storage rack full of boxes and bags near the corner of the basement."
+    },
+    {
+        "exist": true,
+        "file": "860_flag.png",
+        "reference_object": "flag",
+        "question": "Where is the flag of USA?",
+        "answer": "It is on a wooden table near the car in the basement."
+    },
+    {
+        "exist": false,
+        "file": "670_desk.png",
+        "reference_object": "desk",
+        "explanation": "The image quality is too low, and the desk is too ambiguous to be identified."
+    }
+]

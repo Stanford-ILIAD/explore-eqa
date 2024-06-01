@@ -1,0 +1,49 @@
+[
+    {
+        "exist": true,
+        "file": "349_tv.png",
+        "reference_object": "tv",
+        "question": "What is the object above the fireplace in the livingroom?",
+        "answer": "A tv."
+    },
+    {
+        "exist": true,
+        "file": "421_decorative_plant.png",
+        "reference_object": "decorative plant",
+        "question": "What is the object near the piano and an armchair in the corner of the room?",
+        "answer": "A decorative plant."
+    },
+    {
+        "exist": true,
+        "file": "426_basket with books.png",
+        "reference_object": "basket with books",
+        "question": "What is the object closely to the right of the piano?",
+        "answer": "A basket with books."
+    },
+    {
+        "exist": true,
+        "file": "696_ironing board.png",
+        "reference_object": "ironing board",
+        "question": "What is the flat and light blue object leaning on the wall in the laundry room?",
+        "answer": "An ironing board."
+    },
+    {
+        "exist": true,
+        "file": "592_storage box.png",
+        "reference_object": "storage box",
+        "question": "What is the purple object at the bottom of the storage rack in the garage?",
+        "answer": "A storage box."
+    },
+    {
+        "exist": false,
+        "file": "928_saw.png",
+        "reference_object": "saw",
+        "explanation": "The saw in the image is too ambiguous to be identified."
+    },
+    {
+        "exist": false,
+        "file": "795_curtain.png",
+        "reference_object": "curtain",
+        "explanation": "It is hard to uniquely describe the surroundings of the curtain, since there are no salient objects/features around it."
+    }
+]

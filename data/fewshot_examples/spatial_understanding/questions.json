@@ -1,0 +1,42 @@
+[
+    {
+        "exist": true,
+        "file": "424_piano.png",
+        "reference_object": "piano",
+        "question": "What are the objects above the piano?",
+        "answer": "Three framed pieces of artwork hung on the wall."
+    },
+    {
+        "exist": true,
+        "file": "340_sofa.png",
+        "reference_object": "sofa",
+        "question": "What is in between the sofa and the floor lamp in the living room?",
+        "answer": "A side table."
+    },
+    {
+        "exist": true,
+        "file": "391_board games.png",
+        "reference_object": "board games",
+        "question": "Is there extra place near the board games on the wooden shelf for me to store some books?",
+        "answer": "Yes."
+    },
+    {
+        "exist": true,
+        "file": "596_box with books.png",
+        "reference_object": "box with books",
+        "question": "Can I store more books in the box with books on the top right of the rack in the basement?",
+        "answer": "No."
+    },
+    {
+        "exist": false,
+        "file": "670_desk.png",
+        "reference_object": "desk",
+        "explanation": "The image quality is too low, and the desk is too ambiguous to be identified."
+    },
+    {
+        "exist": false,
+        "file": "794_curtain.png",
+        "reference_object": "curtains",
+        "explanation": "There is no salient spatial relationship in the image for spatial understanding problem."
+    }
+]
