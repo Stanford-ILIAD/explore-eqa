@@ -98,6 +98,7 @@ def main(cfg):
 
         metadata = {}
         metadata["question"] = question
+        metadata["scene"] = scene
         metadata["floor"] = floor
         metadata["init_pts"] = init_pts
         metadata["init_angle"] = init_angle
