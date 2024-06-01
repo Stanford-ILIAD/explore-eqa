@@ -56,6 +56,7 @@ planner:
   frontier_max_neighbors: 9
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
+  min_frontier_area: 8
 
 visual_prompt:
   cluster_threshold: 1.0

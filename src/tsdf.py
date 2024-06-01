@@ -57,6 +57,7 @@ class Frontier:
     position: np.ndarray  # integer position in voxel grid
     orientation: np.ndarray  # directional vector of the frontier in float
     image: Optional[str]
+    area: int
 
     def __eq__(self, other):
         if not isinstance(other, Frontier):
@@ -607,6 +608,7 @@ class TSDFPlanner:
         max_val_check_frontier=5.0,
         smooth_sigma=5,
         eps=0.5,
+        min_frontier_area=6,
         **kwargs,
     ):
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
@@ -654,6 +656,7 @@ class TSDFPlanner:
             if label == -1:
                 continue
             cluster = frontiers_regions[labels == label]
+            area = len(cluster)
 
             # take the one that is closest to mean as the center of the cluster
             dist = np.sqrt(
@@ -681,7 +684,7 @@ class TSDFPlanner:
             direction = direction / np.linalg.norm(direction)
 
             frontier_list.append(
-                Frontier(center, direction, None)
+                Frontier(center, direction, None, area)
             )
 
         # remove keys in self.frontiers if not in frontiers
@@ -777,6 +780,10 @@ class TSDFPlanner:
                 ):
                     weight *= 1e-3
 
+                # if frontier is too small, ignore it
+                if frontier.area < min_frontier_area:
+                    weight *= 1e-3
+
                 # Save weight
                 frontiers_weight = np.append(frontiers_weight, weight)
             logging.info(f"Number of frontiers for next pose: {len(self.frontiers)}")
@@ -856,7 +863,7 @@ class TSDFPlanner:
                 next_point = cur_point[:2]
                 direction = np.random.rand(2) - 0.5
                 direction = direction / np.linalg.norm(direction)
-                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None)
+                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None, area=0)
         else:
             point_type = "commit"
             next_point = self.target_point.copy()
