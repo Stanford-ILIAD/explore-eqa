@@ -46,6 +46,7 @@ def main(cfg):
     img_width = cfg.img_width
     cam_intr = get_cam_intr(cfg.hfov, img_height, img_width)
 
+    cfg.seed = np.random.randint(1000000)
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
 
@@ -406,7 +407,7 @@ def main(cfg):
 
             # Determine next point
             if cnt_step < num_step:
-                pts_normal, angle, pts_pix, fig = tsdf_planner.find_next_pose_with_path(
+                pts_normal, angle, pts_pix, fig, path_points = tsdf_planner.find_next_pose_with_path(
                     pts=pts_normal,
                     angle=angle,
                     path_points=path_points,

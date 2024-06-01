@@ -992,6 +992,10 @@ class TSDFPlanner:
             )
             center = cluster[np.argmin(dist)]
 
+            if np.linalg.norm(center - cur_point[:2]) < 1e-3:
+                # skip the frontier if it is too near to the agent
+                continue
+
             # the orientation of the frontier the average of the vector from agent to each point in the cluster
             direction = np.mean(cluster - cur_point[:2], axis=0)
             direction = direction / np.linalg.norm(direction)
@@ -1270,7 +1274,11 @@ class TSDFPlanner:
 
         # Find the yaw angle again
         next_yaw = np.arctan2(direction[1], direction[0]) - np.pi / 2
-        return next_point_normal, next_yaw, next_point, fig
+
+        # update the path points
+        updated_path_points = self.update_path_points(path_points, next_point_normal)
+
+        return next_point_normal, next_yaw, next_point, fig, updated_path_points
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""
@@ -1408,5 +1416,51 @@ class TSDFPlanner:
         return dist, cos
 
     @staticmethod
+    def update_path_points(path_points: List[np.ndarray], point: np.ndarray):
+        # get the closest line segment
+        dist = np.inf
+        min_dist_idx = -1
+        for i in range(len(path_points) - 1):
+            p1, p2 = path_points[i], path_points[i + 1]
+            seg = p2 - p1
+            # if the point is between the two points
+            if np.dot(point - p1, seg) * np.dot(point - p2, seg) <= 0:
+                d = np.abs(np.cross(seg, point - p1) / np.linalg.norm(seg))
+            # else, get the distance to the closest endpoint
+            else:
+                d = min(np.linalg.norm(point - p1), np.linalg.norm(point - p2))
+            if d < dist + 1e-6:
+                dist = d
+                min_dist_idx = i
+
+        updated_path_points = path_points.copy()
+        updated_path_points = updated_path_points[min_dist_idx:]
+
+        # cut the line if point is between the two endpoints of the nearest segment
+        p1, p2 = updated_path_points[0], updated_path_points[1]
+        seg = p2 - p1
+        if np.dot(point - p1, seg) * np.dot(point - p2, seg) <= 0:
+            # find the point on segment that is closest to the point
+            t = np.dot(point - p1, seg) / np.dot(seg, seg)
+            closest_point = p1 + t * seg
+            updated_path_points[0] = closest_point
+
+        return updated_path_points
+
+    @staticmethod
     def rad2vector(angle):
         return np.array([-np.sin(angle), np.cos(angle)])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
