@@ -57,6 +57,7 @@ class Frontier:
     position: np.ndarray  # integer position in voxel grid
     orientation: np.ndarray  # directional vector of the frontier in float
     image: Optional[str]
+    area: int
 
     def __eq__(self, other):
         if not isinstance(other, Frontier):
@@ -607,6 +608,7 @@ class TSDFPlanner:
         max_val_check_frontier=5.0,
         smooth_sigma=5,
         eps=0.5,
+        min_frontier_area=6,
         **kwargs,
     ):
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
@@ -654,6 +656,7 @@ class TSDFPlanner:
             if label == -1:
                 continue
             cluster = frontiers_regions[labels == label]
+            area = len(cluster)
 
             # take the one that is closest to mean as the center of the cluster
             dist = np.sqrt(
@@ -681,7 +684,7 @@ class TSDFPlanner:
             direction = direction / np.linalg.norm(direction)
 
             frontier_list.append(
-                Frontier(center, direction, None)
+                Frontier(center, direction, None, area)
             )
 
         # remove keys in self.frontiers if not in frontiers
@@ -752,7 +755,7 @@ class TSDFPlanner:
 
                 # get weight for path points
                 pos_world = frontier.position * self._voxel_size + self._vol_origin[:2]
-                closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal)
+                closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal, pathfinder, pts[2])
 
                 # Get weight - unexplored, unoccupied, and value
                 weight = np.exp(unexplored_rate / unexplored_T)  # [0-1] before T
@@ -775,6 +778,10 @@ class TSDFPlanner:
                     dist < min_dist_from_cur / self._voxel_size
                     and np.abs(angle - pts_angle) < np.pi / 6
                 ):
+                    weight *= 1e-3
+
+                # if frontier is too small, ignore it
+                if frontier.area < min_frontier_area:
                     weight *= 1e-3
 
                 # Save weight
@@ -856,7 +863,7 @@ class TSDFPlanner:
                 next_point = cur_point[:2]
                 direction = np.random.rand(2) - 0.5
                 direction = direction / np.linalg.norm(direction)
-                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None)
+                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None, area=0)
         else:
             point_type = "commit"
             next_point = self.target_point.copy()
@@ -1108,20 +1115,29 @@ class TSDFPlanner:
                 direction *= -1
         return direction
 
-    @staticmethod
-    def get_closest_distance(path_points: List[np.ndarray], point: np.ndarray, normal: np.ndarray):
+    def get_closest_distance(self, path_points: List[np.ndarray], point: np.ndarray, normal: np.ndarray, pathfinder, height):
         # get the closest distance for each segment in the path curve
+        # use pathfinder's distance instead of the euclidean distance
         dist = np.inf
         cos = None
+
+        # calculate the pathfinder distance in advance for each point in the path to reduce redundancy
+        dist_list = [
+            self.get_distance(point, endpoint, height, pathfinder, input_voxel=False)[0] for endpoint in path_points
+        ]
+
         for i in range(len(path_points) - 1):
             p1, p2 = path_points[i], path_points[i + 1]
             seg = p2 - p1
             # if the point is between the two points
             if np.dot(point - p1, seg) * np.dot(point - p2, seg) <= 0:
-                d = np.abs(np.cross(seg, point - p1) / np.linalg.norm(seg))
+                # get the projection of point onto the line
+                t = np.dot(point - p1, seg) / np.dot(seg, seg)
+                proj_point = p1 + t * seg
+                d = self.get_distance(point, proj_point, height, pathfinder, input_voxel=False)[0]
             # else, get the distance to the closest endpoint
             else:
-                d = min(np.linalg.norm(point - p1), np.linalg.norm(point - p2))
+                d = min(dist_list[i], dist_list[i + 1])
 
             # if the distance is smaller for current edge, update
             if d < dist:
@@ -1170,13 +1186,19 @@ class TSDFPlanner:
     def rad2vector(angle):
         return np.array([-np.sin(angle), np.cos(angle)])
 
-    def get_distance(self, p1, p2, height, pathfinder):
+    def get_distance(self, p1, p2, height, pathfinder, input_voxel=True):
         # p1, p2 are in voxel space
         # convert p1, p2 to habitat space
-        p1_world = p1 * self._voxel_size + self._vol_origin[:2]
+        if input_voxel:
+            p1_world = p1 * self._voxel_size + self._vol_origin[:2]
+            p2_world = p2 * self._voxel_size + self._vol_origin[:2]
+        else:
+            p1_world = p1
+            p2_world = p2
+
         p1_world = np.append(p1_world, height)
         p1_habitat = pos_normal_to_habitat(p1_world)
-        p2_world = p2 * self._voxel_size + self._vol_origin[:2]
+
         p2_world = np.append(p2_world, height)
         p2_habitat = pos_normal_to_habitat(p2_world)
 

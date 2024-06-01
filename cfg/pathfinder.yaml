@@ -31,6 +31,8 @@ init_clearance: 0.5
 max_step_room_size_ratio: 3
 black_pixel_ratio: 0.5
 min_random_init_steps: 2
+extra_view: 2
+extra_view_angle_deg: 120
 
 # Semantic map
 use_active: true
@@ -54,6 +56,7 @@ planner:
   frontier_max_neighbors: 9
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
+  min_frontier_area: 8
 
 visual_prompt:
   cluster_threshold: 1.0
