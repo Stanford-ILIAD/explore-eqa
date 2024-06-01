@@ -48,7 +48,7 @@ planner:
   smooth_sigma: 5
   eps: 1
   min_dist_from_cur: 0.5
-  max_dist_from_cur: 999
+  max_dist_from_cur: 2
   frontier_spacing: 1.5
   frontier_min_neighbors: 8
   frontier_max_neighbors: 9
