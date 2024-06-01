@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
-from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis
+from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors
 from src.habitat import (
     make_simple_cfg,
     make_semantic_cfg,
@@ -104,8 +104,8 @@ def main(cfg):
         #     vlm_question += "\n" + token + "." + " " + choice
 
         # Set data dir for this question - set initial data to be saved
-        episode_data_dir = os.path.join(cfg.output_dir, str(question_ind))
-        episode_frontier_dir = os.path.join(cfg.frontier_dir, str(question_ind))
+        episode_data_dir = os.path.join(str(cfg.output_dir), str(question_ind))
+        episode_frontier_dir = os.path.join(str(cfg.frontier_dir), str(question_ind))
         os.makedirs(episode_data_dir, exist_ok=True)
         os.makedirs(episode_frontier_dir, exist_ok=True)
         result = {"question_ind": question_ind}
@@ -413,28 +413,25 @@ def main(cfg):
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )
-                frontier_voxel_pts = [np.array(key) for key in tsdf_planner.frontiers.keys()]
-                frontier_world_pts = [
-                    frontier * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2] for frontier in frontier_voxel_pts
-                ]
+
                 # Turn to face each frontier point and get rgb image
-                print(f"Num Frontiers: {len(frontier_world_pts)}")
-                for i in range(len(frontier_world_pts)):
-                    frontier_pt = frontier_world_pts[i]
-                    # Turn to face the frontier point
-                    print(frontier_pt, pts)
-                    if tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] is not None:
-                        original_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])])
+                print(f"Num Frontiers: {len(tsdf_planner.frontiers)}")
+                for i, frontier in enumerate(tsdf_planner.frontiers):
+                    pos_voxel = frontier.position
+                    pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                    pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                    if frontier.image is not None:
+                        original_path = os.path.join(episode_frontier_dir, frontier.image)
                         if os.path.exists(original_path):
                             target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
                             os.system(f"cp {original_path} {target_path}")
                     else:
-                        angle_frontier = np.arctan2(frontier_pt[1] - pts[1], frontier_pt[0] - pts[0])
-                        rotation = quat_to_coeffs(
-                            quat_from_angle_axis(angle_frontier, np.array([0, 1, 0]))
+                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                        default_view_direction = np.asarray([0., 0., -1.])
+                        agent_state.rotation = quat_to_coeffs(
+                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
                             * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
                         ).tolist()
-                        agent_state.rotation = rotation
                         agent.set_state(agent_state)
                         # Get observation at current pose - skip black image, meaning robot is outside the floor
                         obs = simulator.get_sensor_observations()
@@ -443,7 +440,7 @@ def main(cfg):
                             os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png"),
                             rgb,
                         )
-                        tsdf_planner.frontiers[tuple(frontier_voxel_pts[i])] = f"{cnt_step}_frontier_{i}.png"
+                        frontier.image = f"{cnt_step}_frontier_{i}.png"
 
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
                 pts_normal = np.append(pts_normal, floor_height)

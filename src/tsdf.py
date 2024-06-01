@@ -44,7 +44,7 @@ from .geom import (
     run_dijkstra,
     fps,
 )
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
 
 
@@ -52,9 +52,16 @@ from dataclasses import dataclass
 class Frontier:
     """Frontier class for frontier-based exploration."""
 
-    position: Tuple[int, int]
-    orientation: Tuple[float, float]
-    image: str
+    position: np.ndarray  # integer position in voxel grid
+    orientation: np.ndarray  # directional vector of the frontier in float
+    image: Optional[str]
+
+    def __eq__(self, other):
+        if not isinstance(other, Frontier):
+            raise TypeError("Cannot compare Frontier with non-Frontier object.")
+        # two frontiers are equal if they have the same position, and their orientations are close
+        return (np.array_equal(self.position, other.position) and
+                np.dot(self.orientation, other.orientation) / (np.linalg.norm(self.orientation) * np.linalg.norm(other.orientation)) > 0.9)
 
 
 class TSDFPlanner:
@@ -144,7 +151,7 @@ class TSDFPlanner:
 
         self.target_point = None
         self.simple_scene_graph = {}
-        self.frontiers = {}
+        self.frontiers: List[Frontier] = []
 
     def increment_scene_graph(self, semantic_obs, gt_scene):
         unique_semantic_ids = np.unique(semantic_obs)
@@ -961,72 +968,72 @@ class TSDFPlanner:
         val_vol_2d = gaussian_filter(val_vol_2d, sigma=smooth_sigma)
 
         # use nonzero_val_vol quantile for frontier normalization
-        frontiers = np.argwhere(
+        frontiers_regions = np.argwhere(
             island
             & (unexplored_neighbors >= frontier_min_neighbors)
             & (unexplored_neighbors <= frontier_max_neighbors)
         )
-        frontiers_pre_cluster = frontiers.copy()
+        frontiers_pre_cluster = frontiers_regions.copy()
 
-        # Fit frontiers
-        if len(frontiers) > 10:
-            db = DBSCAN(eps=eps, min_samples=2).fit(frontiers)
-            labels = db.labels_
-            # get one point from each cluster
-            frontiers_new = np.empty((0, 2))
-            for label in np.unique(labels):
-                if label == -1:
-                    continue
-                cluster = frontiers[labels == label]
-                # take the one that is closest to mean
-                dist = np.sqrt(
-                    (cluster[:, 0] - np.mean(cluster[:, 0])) ** 2
-                    + (cluster[:, 1] - np.mean(cluster[:, 1])) ** 2
-                )
-                center = cluster[np.argmin(dist)]
-                frontiers_new = np.append(frontiers_new, [center], axis=0)
-            frontiers = frontiers_new.astype(int)
+        # cluster frontier regions
+        db = DBSCAN(eps=eps, min_samples=2).fit(frontiers_regions)
+        labels = db.labels_
+        # get one point from each cluster
+        frontier_list = []
+        for label in np.unique(labels):
+            if label == -1:
+                continue
+            cluster = frontiers_regions[labels == label]
 
-        # filter out frontiers that have no sobel gradient
-        # try to replace their gradient calculation with sobel
-        # sobel_y = ndimage.sobel(unexplored, axis=0)
-        # sobel_x = ndimage.sobel(unexplored, axis=1)
-        # sobel_gradient = sobel_x ** 2 + sobel_y ** 2
-        # frontiers_new = np.empty((0, 2))
-        # for point in frontiers:
-        #     if sobel_gradient[point[0], point[1]] != 0:
-        #         frontiers_new = np.append(frontiers_new, [point], axis=0)
-        # frontiers = frontiers_new.astype(int)
+            # take the one that is closest to mean as the center of the cluster
+            dist = np.sqrt(
+                (cluster[:, 0] - np.mean(cluster[:, 0])) ** 2
+                + (cluster[:, 1] - np.mean(cluster[:, 1])) ** 2
+            )
+            center = cluster[np.argmin(dist)]
+
+            # the orientation of the frontier the average of the vector from agent to each point in the cluster
+            direction = np.mean(cluster - cur_point[:2], axis=0)
+            direction = direction / np.linalg.norm(direction)
+
+            frontier_list.append(
+                Frontier(center, direction, None)
+            )
 
         # remove keys in self.frontiers if not in frontiers
-        frontier_keys = [tuple(point) for point in frontiers]
-        for key in list(self.frontiers.keys()):
-            if key not in frontier_keys:
-                del self.frontiers[key]
-        for point in frontiers:
-            if tuple(point) not in self.frontiers.keys():
-                self.frontiers[tuple(point)] = None
+        # frontier_keys = [tuple(frontier.position) for frontier in frontier_list]
+        # for key in self.frontiers.keys():
+        #     if key not in frontier_keys:
+        #         del self.frontiers[key]
+        # for frontier in frontier_list:
+        #     if tuple(frontier.position) not in self.frontiers.keys():
+        #         self.frontiers[tuple(frontier.position)] = frontier
+
+        # remove frontiers that did not appear in current observation
+        self.frontiers = [frontier for frontier in self.frontiers if any(frontier == curr_ft for curr_ft in frontier_list)]
+        # add new frontiers in this observation
+        for frontier in frontier_list:
+            if not any(frontier == prev_ft for prev_ft in self.frontiers):
+                self.frontiers.append(frontier)
 
         # subsample
-        frontiers_weight = np.zeros((len(frontiers)))
+        frontiers_weight = np.zeros((len(self.frontiers)))
 
         # Commit
         point_type = "current"
         if self.target_point is None:
 
             # Get weights for frontiers
-            frontiers_weight = np.empty((0))
-            frontiers_new = np.empty((0, 2))
-            # start_time = time.time(
-            for point in frontiers:
+            frontiers_weight = np.empty(0)
+            for frontier in self.frontiers:
 
-                # find normal into unexplored
-                normal = self.find_normal_into_space(point, unexplored, unexplored)
+                # find normal of the frontier
+                normal = frontier.orientation
 
                 # Then check how much unoccupied in that direction
                 max_pixel_check = int(max_unoccupied_check_frontier / self._voxel_size)
                 dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
+                    frontier.position + np.arange(max_pixel_check)[:, np.newaxis] * normal
                 ).astype(int)
                 dir_pts = self.clip_2d_array(dir_pts)
                 unoccupied_rate = (
@@ -1034,10 +1041,10 @@ class TSDFPlanner:
                     / max_pixel_check
                 )
 
-                # Check the radio of unexplored in the direction, until hits obstacle
+                # Check the ratio of unexplored in the direction, until hits obstacle
                 max_pixel_check = int(max_unexplored_check_frontier / self._voxel_size)
                 dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
+                    frontier.position + np.arange(max_pixel_check)[:, np.newaxis] * normal
                 ).astype(int)
                 dir_pts = self.clip_2d_array(dir_pts)
                 unexplored_rate = (
@@ -1046,38 +1053,38 @@ class TSDFPlanner:
                 )
 
                 # Check value in the direction
-                max_pixel_check = int(max_val_check_frontier / self._voxel_size)
-                dir_pts = np.round(
-                    point + np.arange(max_pixel_check)[:, np.newaxis] * normal
-                ).astype(int)
-                dir_pts = self.clip_2d_array(dir_pts)
-                val_vol_2d_dir = val_vol_2d[dir_pts[:, 0], dir_pts[:, 1]]
-                # keep non zero value only
-                val_vol_2d_dir = val_vol_2d_dir[val_vol_2d_dir > 0]
-                if len(val_vol_2d_dir) == 0:
-                    val = 0
-                else:
-                    val = np.mean(val_vol_2d_dir)
+                # max_pixel_check = int(max_val_check_frontier / self._voxel_size)
+                # dir_pts = np.round(
+                #     point + np.arange(max_pixel_check)[:, np.newaxis] * normal
+                # ).astype(int)
+                # dir_pts = self.clip_2d_array(dir_pts)
+                # val_vol_2d_dir = val_vol_2d[dir_pts[:, 0], dir_pts[:, 1]]
+                # # keep non zero value only
+                # val_vol_2d_dir = val_vol_2d_dir[val_vol_2d_dir > 0]
+                # if len(val_vol_2d_dir) == 0:
+                #     val = 0
+                # else:
+                #     val = np.mean(val_vol_2d_dir)
 
                 # get weight for path points
-                point_world = point * self._voxel_size + self._vol_origin[:2]
-                closest_dist, cosine_dist = self.get_closest_distance(path_points, point_world, normal)
+                pos_world = frontier.position * self._voxel_size + self._vol_origin[:2]
+                closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal)
 
                 # Get weight - unexplored, unoccupied, and value
                 weight = np.exp(unexplored_rate / unexplored_T)  # [0-1] before T
                 weight *= np.exp(unoccupied_rate / unoccupied_T)  # [0-1] before T
-                if not flag_no_val_weight:
-                    weight *= np.exp(
-                        val_vol_2d[point[0], point[1]] / val_T
-                    )  # [0-1] before T
-                    weight *= np.exp(val / val_dir_T)  # [0-1] before T
+                # if not flag_no_val_weight:
+                #     weight *= np.exp(
+                #         val_vol_2d[point[0], point[1]] / val_T
+                #     )  # [0-1] before T
+                #     weight *= np.exp(val / val_dir_T)  # [0-1] before T
 
                 # add weight for path points
                 weight *= np.exp(- closest_dist) * 3
                 weight *= np.exp(cosine_dist)
 
                 # Check distance to current point - make weight very small if too close and aligned
-                dist = np.sqrt((cur_point[0] - point[0]) ** 2 + (cur_point[1] - point[1]) ** 2)
+                dist = np.sqrt((cur_point[0] - frontier.position[0]) ** 2 + (cur_point[1] - frontier.position[1]) ** 2)
                 pts_angle = np.arctan2(normal[1], normal[0]) - np.pi / 2
                 weight *= np.exp(-dist / dist_T)
                 if (
@@ -1088,12 +1095,10 @@ class TSDFPlanner:
 
                 # Save weight
                 frontiers_weight = np.append(frontiers_weight, weight)
-                frontiers_new = np.concatenate((frontiers_new, [point]), axis=0)
-            frontiers = frontiers_new.astype(int)
-            logging.info(f"Number of frontiers for next pose: {len(frontiers)}")
+            logging.info(f"Number of frontiers for next pose: {len(self.frontiers)}")
 
             # raise frontier value if there is frontier
-            if len(frontiers) > 0:
+            if len(self.frontiers) > 0:
                 logging.info(
                     f"Mean and std of frontier weight: {np.mean(frontiers_weight):.3f},"
                     f" {np.std(frontiers_weight):.3f}"
@@ -1118,16 +1123,14 @@ class TSDFPlanner:
                     # )
                     frontier_ind = np.argmax(frontiers_weight)
                     logging.info(f"weight: {frontiers_weight[frontier_ind]:.3f}")
-                    max_point = frontiers[frontier_ind]
+                    max_point = self.frontiers[frontier_ind]
 
                     # find the direction into unexplored
-                    direction = self.find_normal_into_space(
-                        max_point, unexplored, unexplored
-                    )
+                    direction = max_point.orientation
 
                     # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
                     # there is a chance that the point is outside the free space
-                    next_point = np.array(max_point, dtype=float)
+                    next_point = np.array(max_point.position, dtype=float)
                     max_backtrack = int(frontier_spacing / self._voxel_size)
                     min_backtrack = 2
                     num_backtrack = 0
@@ -1157,10 +1160,10 @@ class TSDFPlanner:
             # no patch used
             if point_type == "current":
                 logging.info("No patches, return current point and random direction")
-                max_point = cur_point[:2]
                 next_point = cur_point[:2]
                 direction = np.random.rand(2) - 0.5
                 direction = direction / np.linalg.norm(direction)
+                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None)
         else:
             point_type = "commit"
             next_point = self.target_point.copy()
@@ -1196,40 +1199,40 @@ class TSDFPlanner:
         fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
         agent_orientation = self.rad2vector(angle)
         ax1.imshow(unoccupied)
-        ax1.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
+        ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
         ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
         ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
         ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
         ax1.set_title("Unoccupied")
 
         ax2.imshow(island)
-        for point in frontiers:
-            if self.frontiers[tuple(point)] is not None:
-                ax2.scatter(point[1], point[0], color="g", s=50, alpha=1)
+        for frontier in self.frontiers:
+            if frontier.image is not None:
+                ax2.scatter(frontier.position[1], frontier.position[0], color="g", s=50, alpha=1)
             else:
-                ax2.scatter(point[1], point[0], color="r", s=50, alpha=1)
+                ax2.scatter(frontier.position[1], frontier.position[0], color="r", s=50, alpha=1)
         ax2.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
         ax2.set_title("Island")
 
         ax3.imshow(unexplored_neighbors)
         for point in frontiers_pre_cluster:
             ax3.scatter(point[1], point[0], color="white", s=20, alpha=1)
-        for point in frontiers:
-            ax3.scatter(point[1], point[0], color="m", s=10, alpha=1)
-            normal = self.find_normal_into_space(point, unexplored, unexplored)
+        for frontier in self.frontiers:
+            ax3.scatter(frontier.position[1], frontier.position[0], color="m", s=10, alpha=1)
+            normal = frontier.orientation
             dx, dy = normal * 4
-            ax3.arrow(point[1], point[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='m')
-        ax3.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
+            ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='m')
+        ax3.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
         ax3.set_title("Unexplored neighbors")
 
         im = ax4.imshow(val_vol_2d)
-        for point in frontiers:
-            ax4.scatter(point[1], point[0], color="white", s=20, alpha=1)
-            normal = self.find_normal_into_space(point, unexplored, unexplored)
+        for frontier in self.frontiers:
+            ax4.scatter(frontier.position[1], frontier.position[0], color="white", s=20, alpha=1)
+            normal = frontier.orientation
             dx, dy = normal * 4
-            ax4.arrow(point[1], point[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
+            ax4.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
         fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
-        ax4.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
+        ax4.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
         ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
         ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
         ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
@@ -1249,8 +1252,8 @@ class TSDFPlanner:
         ax5.set_title("Path on island")
 
         frontier_weights = np.zeros_like(val_vol_2d)
-        for point, weight in zip(frontiers, frontiers_weight):
-            frontier_weights[point[0], point[1]] = weight
+        for frontier, weight in zip(self.frontiers, frontiers_weight):
+            frontier_weights[frontier.position[0], frontier.position[1]] = weight
         im = ax6.imshow(frontier_weights)
         # draw path points
         for i_pp in range(len(path_points) - 1):
