@@ -1,0 +1,665 @@
+Scene loaded: DoSbsoo4EAg
+Rare classes: ['toilet paper dispenser', 'shower glass', 'shower hose', 'shower soap shelf', 'plunger', 'shower floor', 'shower handle', 'shower tub', 'shower door frame', 'bath sink', 'toilet paper', 'alarm clock', 'panel screen', 'armchair', 'couch', 'microwave', 'refrigerator', 'range hood', 'dishwasher', 'oven and stove', 'toaster', 'kettle', 'coffee machine', 'cutting board', 'ceiling lamp']
+Cannot find a navigable point near the object 6: toilet paper dispenser in distance 1.5!
+Cannot find a navigable point near the object 6: toilet paper dispenser in distance 2.0!
+Cannot find a navigable point near the object 6: toilet paper dispenser in distance 2.5!
+Cannot find a navigable point near the object 6: toilet paper dispenser in distance 3.0!
+Cannot find a navigable point near the object 7: shower glass in distance 1.5!
+Cannot find a navigable point near the object 7: shower glass in distance 2.0!
+Cannot find a navigable point near the object 7: shower glass in distance 2.5!
+Cannot find a navigable point near the object 7: shower glass in distance 3.0!
+Cannot find a navigable point near the object 10: shower soap shelf in distance 1.5!
+Cannot find a navigable point near the object 10: shower soap shelf in distance 2.0!
+Cannot find a navigable point near the object 10: shower soap shelf in distance 2.5!
+Cannot find a navigable point near the object 10: shower soap shelf in distance 3.0!
+Cannot find a navigable point near the object 22: plunger in distance 1.5!
+Cannot find a navigable point near the object 22: plunger in distance 2.0!
+Cannot find a navigable point near the object 22: plunger in distance 2.5!
+Cannot find a navigable point near the object 22: plunger in distance 3.0!
+Cannot find a navigable point near the object 70: shower tub in distance 1.5!
+Cannot find a navigable point near the object 70: shower tub in distance 2.0!
+Cannot find a navigable point near the object 70: shower tub in distance 2.5!
+Object id: 70, Class: shower tub, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the pattern of the tiles surrounding the shower tub that is next to the toilet and vanity?
+
+Answer: The tiles have a horizontal striped pattern in shades of gray and white.
+Cateogry: attribute_recognition
+Question: What is the pattern of the tiles surrounding the shower tub that is next to the toilet and vanity?
+Answer: The tiles have a horizontal striped pattern in shades of gray and white.
+Cannot find a navigable point near the object 74: bath sink in distance 1.5!
+Cannot find a navigable point near the object 74: bath sink in distance 2.0!
+Object id: 74, Class: bath sink, View: 2 saved!
+Object id: 74, Class: bath sink, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is directly above the bath sink in the bathroom?
+
+Answer: A mirror.
+Cateogry: spatial_understanding
+Question: What is directly above the bath sink in the bathroom?
+Answer: A mirror.
+Cannot find a navigable point near the object 75: toilet paper in distance 1.5!
+Cannot find a navigable point near the object 75: toilet paper in distance 2.0!
+Cannot find a navigable point near the object 75: toilet paper in distance 2.5!
+Cannot find a navigable point near the object 75: toilet paper in distance 3.0!
+Cannot find a navigable point near the object 120: alarm clock in distance 1.5!
+Cannot find a navigable point near the object 120: alarm clock in distance 2.0!
+Cannot find a navigable point near the object 120: alarm clock in distance 2.5!
+Cannot find a navigable point near the object 120: alarm clock in distance 3.0!
+Cannot find a navigable point near the object 145: panel screen in distance 1.5!
+Cannot find a navigable point near the object 145: panel screen in distance 2.0!
+Cannot find a navigable point near the object 145: panel screen in distance 2.5!
+Cannot find a navigable point near the object 145: panel screen in distance 3.0!
+Cannot find a navigable point near the object 199: armchair in distance 1.5!
+Object id: 199, Class: armchair, View: 1 saved!
+Object id: 199, Class: armchair, View: 2 saved!
+Object id: 199, Class: armchair, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is behind the armchair near the window in the living room?
+
+Answer: A floor lamp.
+Cateogry: spatial_understanding
+Question: What is behind the armchair near the window in the living room?
+Answer: A floor lamp.
+Cannot find a navigable point near the object 213: couch in distance 1.5!
+Cannot find a navigable point near the object 213: couch in distance 2.0!
+Cannot find a navigable point near the object 213: couch in distance 2.5!
+Cannot find a navigable point near the object 213: couch in distance 3.0!
+Object id: 222, Class: microwave, View: 0 saved!
+Cannot find a navigable point near the object 222: microwave in distance 2.0!
+Cannot find a navigable point near the object 222: microwave in distance 2.5!
+Cannot find a navigable point near the object 222: microwave in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the microwave that is mounted above the kitchen counter near the stove?
+
+Answer: Black and silver.
+Cateogry: attribute_recognition
+Question: What is the color of the microwave that is mounted above the kitchen counter near the stove?
+Answer: Black and silver.
+Cannot find a navigable point near the object 225: refrigerator in distance 1.5!
+Cannot find a navigable point near the object 225: refrigerator in distance 2.0!
+Cannot find a navigable point near the object 225: refrigerator in distance 2.5!
+Object id: 225, Class: refrigerator, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Is the refrigerator in the kitchen closed?
+
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the refrigerator in the kitchen closed?
+Answer: Yes.
+Cannot find a navigable point near the object 226: range hood in distance 1.5!
+Cannot find a navigable point near the object 226: range hood in distance 2.0!
+Cannot find a navigable point near the object 226: range hood in distance 2.5!
+Cannot find a navigable point near the object 226: range hood in distance 3.0!
+Cannot find a navigable point near the object 230: dishwasher in distance 1.5!
+Object id: 230, Class: dishwasher, View: 1 saved!
+Object id: 230, Class: dishwasher, View: 2 saved!
+Object id: 230, Class: dishwasher, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is to the right of the dishwasher in the kitchen?
+
+Answer: A stove.
+Cateogry: spatial_understanding
+Question: What is to the right of the dishwasher in the kitchen?
+Answer: A stove.
+Cannot find a navigable point near the object 231: oven and stove in distance 1.5!
+Object id: 231, Class: oven and stove, View: 1 saved!
+Object id: 231, Class: oven and stove, View: 2 saved!
+Object id: 231, Class: oven and stove, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the object located between the countertop and the refrigerator in the kitchen?
+
+Answer: An oven and stove.
+Cateogry: object_recognition
+Question: What is the object located between the countertop and the refrigerator in the kitchen?
+Answer: An oven and stove.
+Cannot find a navigable point near the object 235: toaster in distance 1.5!
+Cannot find a navigable point near the object 235: toaster in distance 2.0!
+Cannot find a navigable point near the object 235: toaster in distance 2.5!
+Cannot find a navigable point near the object 235: toaster in distance 3.0!
+Cannot find a navigable point near the object 236: kettle in distance 1.5!
+Cannot find a navigable point near the object 236: kettle in distance 2.0!
+Cannot find a navigable point near the object 236: kettle in distance 2.5!
+Cannot find a navigable point near the object 236: kettle in distance 3.0!
+Cannot find a navigable point near the object 237: coffee machine in distance 1.5!
+Cannot find a navigable point near the object 237: coffee machine in distance 2.0!
+Cannot find a navigable point near the object 237: coffee machine in distance 2.5!
+Cannot find a navigable point near the object 237: coffee machine in distance 3.0!
+Object id: 240, Class: cutting board, View: 0 saved!
+Cannot find a navigable point near the object 240: cutting board in distance 2.0!
+Cannot find a navigable point near the object 240: cutting board in distance 2.5!
+Cannot find a navigable point near the object 240: cutting board in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the cutting board in the kitchen?
+
+Answer: The cutting board is on the kitchen counter, next to the knife block and near the refrigerator.
+Cateogry: object_localization
+Question: Where is the cutting board in the kitchen?
+Answer: The cutting board is on the kitchen counter, next to the knife block and near the refrigerator.
+Cannot find a navigable point near the object 248: ceiling lamp in distance 1.5!
+Cannot find a navigable point near the object 248: ceiling lamp in distance 2.0!
+Cannot find a navigable point near the object 248: ceiling lamp in distance 2.5!
+Cannot find a navigable point near the object 248: ceiling lamp in distance 3.0!
+Scene loaded: W16Bm4ysK8v
+Rare classes: ['flower', 'bath', 'toilet paper dispenser', 'shower caddy', 'rail', 'radio', 'curtain rail', 'sliding glass door', 'paper', 'keyboard', 'computer mouse', 'pad', 'tablet', 'laptop', 'exercise ball', 'ornament', 'box of tissue', 'shower knob', 'shower bench', 'shower handle', 'cosmetics', 'chest', 'parapet', 'washing machine', 'bottle of detergent', 'clothes dryer', 'fire extinguisher', 'boiler', 'window frame', 'appliance', 'rack', 'icebox', 'garage door', 'garage door frame', 'garage door opener bar', 'garage door motor', 'shirt', 'cloth', 'grill', 'broom', 'shovel', 'cover', 'doorstep', 'projector', 'flag', 'iron board', 'vacuum cleaner', 'light switch', 'electric wire casing', 'toilet brush', 'sensor', 'stack', 'telephone', 'can', 'cutting board', 'candle', 'soap dish', 'coffee machine', 'stove', 'dishwasher', 'wine cabinet', 'microwave', 'table cloth', 'stand', 'printer', 'pc tower', 'flower vase', 'ceiling fan', 'armchair', 'pouffe', 'couch', 'coffee table', 'fireplace', 'step', 'mortar', 'rocking chair', 'tv', 'tv stand', 'plant ornament', 'mixer', 'roof']
+Loaded 8 previously generated questions
+Object id: 7, Class: flower, View: 0 saved!
+Object id: 7, Class: flower, View: 1 saved!
+Cannot find a navigable point near the object 7: flower in distance 2.5!
+Cannot find a navigable point near the object 7: flower in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the object placed on the counter next to the toilet in the bathroom?
+
+Answer: A flower.
+Cateogry: object_recognition
+Question: What is the object placed on the counter next to the toilet in the bathroom?
+Answer: A flower.
+Cannot find a navigable point near the object 16: bath in distance 1.5!
+Cannot find a navigable point near the object 16: bath in distance 2.0!
+Object id: 16, Class: bath, View: 2 saved!
+Object id: 16, Class: bath, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the object located between the sink and the toilet in the bathroom?
+
+Answer: A bath.
+Cateogry: object_recognition
+Question: What is the object located between the sink and the toilet in the bathroom?
+Answer: A bath.
+Cannot find a navigable point near the object 17: toilet paper dispenser in distance 1.5!
+Cannot find a navigable point near the object 17: toilet paper dispenser in distance 2.0!
+Cannot find a navigable point near the object 17: toilet paper dispenser in distance 2.5!
+Cannot find a navigable point near the object 17: toilet paper dispenser in distance 3.0!
+Cannot find a navigable point near the object 100: radio in distance 1.5!
+Cannot find a navigable point near the object 100: radio in distance 2.0!
+Cannot find a navigable point near the object 100: radio in distance 2.5!
+Cannot find a navigable point near the object 100: radio in distance 3.0!
+Cannot find a navigable point near the object 107: sliding glass door in distance 1.5!
+Cannot find a navigable point near the object 107: sliding glass door in distance 2.0!
+Cannot find a navigable point near the object 107: sliding glass door in distance 2.5!
+Cannot find a navigable point near the object 107: sliding glass door in distance 3.0!
+Cannot find a navigable point near the object 111: paper in distance 1.5!
+Cannot find a navigable point near the object 111: paper in distance 2.0!
+Cannot find a navigable point near the object 111: paper in distance 2.5!
+Cannot find a navigable point near the object 111: paper in distance 3.0!
+Cannot find a navigable point near the object 113: keyboard in distance 1.5!
+Cannot find a navigable point near the object 113: keyboard in distance 2.0!
+Cannot find a navigable point near the object 113: keyboard in distance 2.5!
+Cannot find a navigable point near the object 113: keyboard in distance 3.0!
+Cannot find a navigable point near the object 114: computer mouse in distance 1.5!
+Cannot find a navigable point near the object 114: computer mouse in distance 2.0!
+Cannot find a navigable point near the object 114: computer mouse in distance 2.5!
+Cannot find a navigable point near the object 114: computer mouse in distance 3.0!
+Cannot find a navigable point near the object 115: pad in distance 1.5!
+Cannot find a navigable point near the object 115: pad in distance 2.0!
+Cannot find a navigable point near the object 115: pad in distance 2.5!
+Cannot find a navigable point near the object 115: pad in distance 3.0!
+Cannot find a navigable point near the object 119: tablet in distance 1.5!
+Cannot find a navigable point near the object 119: tablet in distance 2.0!
+Cannot find a navigable point near the object 119: tablet in distance 2.5!
+Cannot find a navigable point near the object 119: tablet in distance 3.0!
+Object id: 120, Class: laptop, View: 0 saved!
+Cannot find a navigable point near the object 120: laptop in distance 2.0!
+Cannot find a navigable point near the object 120: laptop in distance 2.5!
+Cannot find a navigable point near the object 120: laptop in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the laptop that is placed on the white table near the dual monitors?
+
+Answer: Black.
+Cateogry: attribute_recognition
+Question: What is the color of the laptop that is placed on the white table near the dual monitors?
+Answer: Black.
+Object id: 137, Class: exercise ball, View: 0 saved!
+Object id: 137, Class: exercise ball, View: 1 saved!
+Object id: 137, Class: exercise ball, View: 2 saved!
+Cannot find a navigable point near the object 137: exercise ball in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the large blue object in the corner next to the basket and dresser?
+
+Answer: An exercise ball.
+Cateogry: object_recognition
+Question: What is the large blue object in the corner next to the basket and dresser?
+Answer: An exercise ball.
+Cannot find a navigable point near the object 154: box of tissue in distance 1.5!
+Cannot find a navigable point near the object 154: box of tissue in distance 2.0!
+Cannot find a navigable point near the object 154: box of tissue in distance 2.5!
+Cannot find a navigable point near the object 154: box of tissue in distance 3.0!
+Object id: 175, Class: shower bench, View: 0 saved!
+Cannot find a navigable point near the object 175: shower bench in distance 2.0!
+Cannot find a navigable point near the object 175: shower bench in distance 2.5!
+Cannot find a navigable point near the object 175: shower bench in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the shower bench located?
+
+Answer: The shower bench is in the corner of the tiled shower, below the showerhead and next to the glass door.
+Cateogry: object_localization
+Question: Where is the shower bench located?
+Answer: The shower bench is in the corner of the tiled shower, below the showerhead and next to the glass door.
+Cannot find a navigable point near the object 232: chest in distance 1.5!
+Object id: 232, Class: chest, View: 1 saved!
+Object id: 232, Class: chest, View: 2 saved!
+Cannot find a navigable point near the object 232: chest in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the dark wooden object located at the foot of the bed in the bedroom?
+
+Answer: A chest.
+Cateogry: object_recognition
+Question: What is the dark wooden object located at the foot of the bed in the bedroom?
+Answer: A chest.
+Cannot find a navigable point near the object 270: washing machine in distance 1.5!
+Object id: 270, Class: washing machine, View: 1 saved!
+Object id: 270, Class: washing machine, View: 2 saved!
+Object id: 270, Class: washing machine, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What can I use to wash my clothes?
+
+Answer: The washing machine next to the dryer.
+Cateogry: functional_reasoning
+Question: What can I use to wash my clothes?
+Answer: The washing machine next to the dryer.
+Cannot find a navigable point near the object 271: bottle of detergent in distance 1.5!
+Cannot find a navigable point near the object 271: bottle of detergent in distance 2.0!
+Cannot find a navigable point near the object 271: bottle of detergent in distance 2.5!
+Cannot find a navigable point near the object 271: bottle of detergent in distance 3.0!
+Cannot find a navigable point near the object 276: clothes dryer in distance 1.5!
+Object id: 276, Class: clothes dryer, View: 1 saved!
+Object id: 276, Class: clothes dryer, View: 2 saved!
+Object id: 276, Class: clothes dryer, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What can I use to dry my clothes after washing them?
+
+Answer: The clothes dryer next to the washing machine.
+Cateogry: functional_reasoning
+Question: What can I use to dry my clothes after washing them?
+Answer: The clothes dryer next to the washing machine.
+Cannot find a navigable point near the object 298: fire extinguisher in distance 1.5!
+Cannot find a navigable point near the object 298: fire extinguisher in distance 2.0!
+Cannot find a navigable point near the object 298: fire extinguisher in distance 2.5!
+Cannot find a navigable point near the object 298: fire extinguisher in distance 3.0!
+Cannot find a navigable point near the object 299: boiler in distance 1.5!
+Cannot find a navigable point near the object 299: boiler in distance 2.0!
+Object id: 299, Class: boiler, View: 2 saved!
+Object id: 299, Class: boiler, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the boiler located?
+
+Answer: The boiler is in the laundry room, next to the washing machine and dryer, near the doorway leading to the dining area.
+Cateogry: object_localization
+Question: Where is the boiler located?
+Answer: The boiler is in the laundry room, next to the washing machine and dryer, near the doorway leading to the dining area.
+Cannot find a navigable point near the object 319: rack in distance 1.5!
+Object id: 319, Class: rack, View: 1 saved!
+Object id: 319, Class: rack, View: 2 saved!
+Object id: 319, Class: rack, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the wooden rack with the boxes on it?
+
+Answer: The wooden rack with the boxes on it is in the garage, next to the bicycles and near the door leading to the other room.
+Cateogry: object_localization
+Question: Where is the wooden rack with the boxes on it?
+Answer: The wooden rack with the boxes on it is in the garage, next to the bicycles and near the door leading to the other room.
+Cannot find a navigable point near the object 368: icebox in distance 1.5!
+Cannot find a navigable point near the object 368: icebox in distance 2.0!
+Object id: 368, Class: icebox, View: 2 saved!
+Object id: 368, Class: icebox, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the large white object on top of the cardboard box near the garage door?
+
+Answer: An icebox.
+Cateogry: object_recognition
+Question: What is the large white object on top of the cardboard box near the garage door?
+Answer: An icebox.
+Cannot find a navigable point near the object 416: garage door in distance 1.5!
+Cannot find a navigable point near the object 416: garage door in distance 2.0!
+Cannot find a navigable point near the object 416: garage door in distance 2.5!
+Cannot find a navigable point near the object 416: garage door in distance 3.0!
+Object id: 421, Class: shirt, View: 0 saved!
+Cannot find a navigable point near the object 421: shirt in distance 2.0!
+Cannot find a navigable point near the object 421: shirt in distance 2.5!
+Cannot find a navigable point near the object 421: shirt in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is directly above the shirt hanging near the garage door?
+
+Answer: A ladder.
+Cateogry: spatial_understanding
+Question: What is directly above the shirt hanging near the garage door?
+Answer: A ladder.
+Object id: 433, Class: cloth, View: 0 saved!
+Object id: 433, Class: cloth, View: 1 saved!
+Object id: 433, Class: cloth, View: 2 saved!
+Cannot find a navigable point near the object 433: cloth in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the folded cloth stored in the garage?
+
+Answer: The folded cloth is stored on top of a white bucket and a grey storage box, near the garage door and under a ladder.
+Cateogry: object_localization
+Question: Where is the folded cloth stored in the garage?
+Answer: The folded cloth is stored on top of a white bucket and a grey storage box, near the garage door and under a ladder.
+Cannot find a navigable point near the object 438: grill in distance 1.5!
+Cannot find a navigable point near the object 438: grill in distance 2.0!
+Object id: 438, Class: grill, View: 2 saved!
+Object id: 438, Class: grill, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Where is the grill stored in the garage?
+
+Answer: The grill is stored in the garage, near the wall with various hanging items and tools, next to a wooden stool and under some blankets or covers.
+Cateogry: object_localization
+Question: Where is the grill stored in the garage?
+Answer: The grill is stored in the garage, near the wall with various hanging items and tools, next to a wooden stool and under some blankets or covers.
+Cannot find a navigable point near the object 447: broom in distance 1.5!
+Cannot find a navigable point near the object 447: broom in distance 2.0!
+Cannot find a navigable point near the object 447: broom in distance 2.5!
+Cannot find a navigable point near the object 447: broom in distance 3.0!
+Cannot find a navigable point near the object 448: shovel in distance 1.5!
+Cannot find a navigable point near the object 448: shovel in distance 2.0!
+Cannot find a navigable point near the object 448: shovel in distance 2.5!
+Cannot find a navigable point near the object 448: shovel in distance 3.0!
+Cannot find a navigable point near the object 460: projector in distance 1.5!
+Cannot find a navigable point near the object 460: projector in distance 2.0!
+Cannot find a navigable point near the object 460: projector in distance 2.5!
+Cannot find a navigable point near the object 460: projector in distance 3.0!
+Cannot find a navigable point near the object 495: flag in distance 1.5!
+Cannot find a navigable point near the object 495: flag in distance 2.0!
+Cannot find a navigable point near the object 495: flag in distance 2.5!
+Cannot find a navigable point near the object 495: flag in distance 3.0!
+Cannot find a navigable point near the object 509: iron board in distance 1.5!
+Object id: 509, Class: iron board, View: 1 saved!
+Cannot find a navigable point near the object 509: iron board in distance 2.5!
+Cannot find a navigable point near the object 509: iron board in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What can I use to iron my clothes?
+
+Answer: The ironing board in the corner of the room.
+Cateogry: functional_reasoning
+Question: What can I use to iron my clothes?
+Answer: The ironing board in the corner of the room.
+Cannot find a navigable point near the object 510: vacuum cleaner in distance 1.5!
+Cannot find a navigable point near the object 510: vacuum cleaner in distance 2.0!
+Cannot find a navigable point near the object 510: vacuum cleaner in distance 2.5!
+Cannot find a navigable point near the object 510: vacuum cleaner in distance 3.0!
+Cannot find a navigable point near the object 530: light switch in distance 1.5!
+Cannot find a navigable point near the object 530: light switch in distance 2.0!
+Cannot find a navigable point near the object 530: light switch in distance 2.5!
+Cannot find a navigable point near the object 530: light switch in distance 3.0!
+Cannot find a navigable point near the object 548: toilet brush in distance 1.5!
+Cannot find a navigable point near the object 548: toilet brush in distance 2.0!
+Cannot find a navigable point near the object 548: toilet brush in distance 2.5!
+Cannot find a navigable point near the object 548: toilet brush in distance 3.0!
+Cannot find a navigable point near the object 578: sensor in distance 1.5!
+Cannot find a navigable point near the object 578: sensor in distance 2.0!
+Cannot find a navigable point near the object 578: sensor in distance 2.5!
+Cannot find a navigable point near the object 578: sensor in distance 3.0!
+Cannot find a navigable point near the object 591: telephone in distance 1.5!
+Cannot find a navigable point near the object 591: telephone in distance 2.0!
+Cannot find a navigable point near the object 591: telephone in distance 2.5!
+Cannot find a navigable point near the object 591: telephone in distance 3.0!
+Cannot find a navigable point near the object 605: can in distance 1.5!
+Cannot find a navigable point near the object 605: can in distance 2.0!
+Cannot find a navigable point near the object 605: can in distance 2.5!
+Cannot find a navigable point near the object 605: can in distance 3.0!
+Object id: 606, Class: cutting board, View: 0 saved!
+Cannot find a navigable point near the object 606: cutting board in distance 2.0!
+Cannot find a navigable point near the object 606: cutting board in distance 2.5!
+Cannot find a navigable point near the object 606: cutting board in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What can I use to chop vegetables for dinner?
+
+Answer: The cutting board on the kitchen counter.
+Cateogry: functional_reasoning
+Question: What can I use to chop vegetables for dinner?
+Answer: The cutting board on the kitchen counter.
+Cannot find a navigable point near the object 610: soap dish in distance 1.5!
+Cannot find a navigable point near the object 610: soap dish in distance 2.0!
+Cannot find a navigable point near the object 610: soap dish in distance 2.5!
+Cannot find a navigable point near the object 610: soap dish in distance 3.0!
+Object id: 612, Class: coffee machine, View: 0 saved!
+Cannot find a navigable point near the object 612: coffee machine in distance 2.0!
+Cannot find a navigable point near the object 612: coffee machine in distance 2.5!
+Cannot find a navigable point near the object 612: coffee machine in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What color is the coffee machine that is placed on the green marble countertop near the stove?
+
+Answer: Black.
+Cateogry: attribute_recognition
+Question: What color is the coffee machine that is placed on the green marble countertop near the stove?
+Answer: Black.
+Object id: 614, Class: stove, View: 0 saved!
+Object id: 614, Class: stove, View: 1 saved!
+Object id: 614, Class: stove, View: 2 saved!
+Cannot find a navigable point near the object 614: stove in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the stove that is located between the dishwasher and the dining table area?
+
+Answer: Stainless steel.
+Cateogry: attribute_recognition
+Question: What is the color of the stove that is located between the dishwasher and the dining table area?
+Answer: Stainless steel.
+Object id: 619, Class: dishwasher, View: 0 saved!
+Object id: 619, Class: dishwasher, View: 1 saved!
+Object id: 619, Class: dishwasher, View: 2 saved!
+Cannot find a navigable point near the object 619: dishwasher in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What can I use to wash the dirty dishes quickly?
+
+Answer: The dishwasher under the counter.
+Cateogry: functional_reasoning
+Question: What can I use to wash the dirty dishes quickly?
+Answer: The dishwasher under the counter.
+Object id: 623, Class: wine cabinet, View: 0 saved!
+Object id: 623, Class: wine cabinet, View: 1 saved!
+Object id: 623, Class: wine cabinet, View: 2 saved!
+Cannot find a navigable point near the object 623: wine cabinet in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the countertop above the wine cabinet that is located near the staircase?
+
+Answer: Green.
+Cateogry: attribute_recognition
+Question: What is the color of the countertop above the wine cabinet that is located near the staircase?
+Answer: Green.
+Object id: 628, Class: microwave, View: 0 saved!
+Cannot find a navigable point near the object 628: microwave in distance 2.0!
+Cannot find a navigable point near the object 628: microwave in distance 2.5!
+Cannot find a navigable point near the object 628: microwave in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Is the door of the microwave on the kitchen counter closed?
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the door of the microwave on the kitchen counter closed?
+Answer: Yes.
+Object id: 679, Class: stand, View: 0 saved!
+Cannot find a navigable point near the object 679: stand in distance 2.0!
+Cannot find a navigable point near the object 679: stand in distance 2.5!
+Cannot find a navigable point near the object 679: stand in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the object on the desk near the window that holds various items?
+
+Answer: A stand.
+Cateogry: object_recognition
+Question: What is the object on the desk near the window that holds various items?
+Answer: A stand.
+Object id: 682, Class: printer, View: 0 saved!
+Cannot find a navigable point near the object 682: printer in distance 2.0!
+Cannot find a navigable point near the object 682: printer in distance 2.5!
+Cannot find a navigable point near the object 682: printer in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is to the right of the printer on the wooden desk near the window?
+
+Answer: A black guitar case.
+Cateogry: spatial_understanding
+Question: What is to the right of the printer on the wooden desk near the window?
+Answer: A black guitar case.
+Object id: 686, Class: pc tower, View: 0 saved!
+Cannot find a navigable point near the object 686: pc tower in distance 2.0!
+Cannot find a navigable point near the object 686: pc tower in distance 2.5!
+Cannot find a navigable point near the object 686: pc tower in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Is the PC tower under the wooden desk in the study room turned on?
+
+Answer: No.
+Cateogry: object_state_recognition
+Question: Is the PC tower under the wooden desk in the study room turned on?
+Answer: No.
+Object id: 720, Class: flower vase, View: 0 saved!
+Object id: 720, Class: flower vase, View: 1 saved!
+Cannot find a navigable point near the object 720: flower vase in distance 2.5!
+Cannot find a navigable point near the object 720: flower vase in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is hanging on the wall to the left of the flower vase on the wooden dresser?
+
+Answer: A circular mirror with a decorative frame.
+Cateogry: spatial_understanding
+Question: What is hanging on the wall to the left of the flower vase on the wooden dresser?
+Answer: A circular mirror with a decorative frame.
+Cannot find a navigable point near the object 723: ceiling fan in distance 1.5!
+Cannot find a navigable point near the object 723: ceiling fan in distance 2.0!
+Cannot find a navigable point near the object 723: ceiling fan in distance 2.5!
+Cannot find a navigable point near the object 723: ceiling fan in distance 3.0!
+Cannot find a navigable point near the object 756: armchair in distance 1.5!
+Cannot find a navigable point near the object 756: armchair in distance 2.0!
+Cannot find a navigable point near the object 756: armchair in distance 2.5!
+Cannot find a navigable point near the object 756: armchair in distance 3.0!
+Cannot find a navigable point near the object 764: pouffe in distance 1.5!
+Object id: 764, Class: pouffe, View: 1 saved!
+Object id: 764, Class: pouffe, View: 2 saved!
+Object id: 764, Class: pouffe, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the pouffe that is placed next to the armchair near the stone fireplace?
+
+Answer: Dark gray.
+Cateogry: attribute_recognition
+Question: What is the color of the pouffe that is placed next to the armchair near the stone fireplace?
+Answer: Dark gray.
+Cannot find a navigable point near the object 770: couch in distance 1.5!
+Cannot find a navigable point near the object 770: couch in distance 2.0!
+Cannot find a navigable point near the object 770: couch in distance 2.5!
+Cannot find a navigable point near the object 770: couch in distance 3.0!
+Cannot find a navigable point near the object 773: coffee table in distance 1.5!
+Object id: 773, Class: coffee table, View: 1 saved!
+Object id: 773, Class: coffee table, View: 2 saved!
+Object id: 773, Class: coffee table, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: What can I use to place my coffee cup while I relax on the sofa?
+
+Answer: The coffee table in the living room.
+Invalid output for GPT: What can I use to place my coffee cup while I relax on the sofa?
+
+Answer: The coffee table in the living room.
+Cannot find a navigable point near the object 778: fireplace in distance 1.5!
+Cannot find a navigable point near the object 778: fireplace in distance 2.0!
+Cannot find a navigable point near the object 778: fireplace in distance 2.5!
+Cannot find a navigable point near the object 778: fireplace in distance 3.0!
+Cannot find a navigable point near the object 785: mortar in distance 1.5!
+Cannot find a navigable point near the object 785: mortar in distance 2.0!
+Cannot find a navigable point near the object 785: mortar in distance 2.5!
+Cannot find a navigable point near the object 785: mortar in distance 3.0!
+Cannot find a navigable point near the object 791: rocking chair in distance 1.5!
+Cannot find a navigable point near the object 791: rocking chair in distance 2.0!
+Cannot find a navigable point near the object 791: rocking chair in distance 2.5!
+Cannot find a navigable point near the object 791: rocking chair in distance 3.0!
+Cannot find a navigable point near the object 795: tv in distance 1.5!
+Cannot find a navigable point near the object 795: tv in distance 2.0!
+Object id: 795, Class: tv, View: 2 saved!
+Object id: 795, Class: tv, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the TV that is placed near the staircase and below a wall painting?
+
+Answer: Black.
+Cateogry: attribute_recognition
+Question: What is the color of the TV that is placed near the staircase and below a wall painting?
+Answer: Black.
+Cannot find a navigable point near the object 796: tv stand in distance 1.5!
+Object id: 796, Class: tv stand, View: 1 saved!
+Cannot find a navigable point near the object 796: tv stand in distance 2.5!
+Cannot find a navigable point near the object 796: tv stand in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the color of the TV stand that is placed near the staircase and below the television?
+
+Answer: Black.
+Cateogry: attribute_recognition
+Question: What is the color of the TV stand that is placed near the staircase and below the television?
+Answer: Black.
+Cannot find a navigable point near the object 843: plant ornament in distance 1.5!
+Cannot find a navigable point near the object 843: plant ornament in distance 2.0!
+Cannot find a navigable point near the object 843: plant ornament in distance 2.5!
+Cannot find a navigable point near the object 843: plant ornament in distance 3.0!
+Object id: 853, Class: mixer, View: 0 saved!
+Cannot find a navigable point near the object 853: mixer in distance 2.0!
+Cannot find a navigable point near the object 853: mixer in distance 2.5!
+Cannot find a navigable point near the object 853: mixer in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is the silver object on the wooden cabinet near the wall with the horse picture?
+
+Answer: A mixer.
+Cateogry: object_recognition
+Question: What is the silver object on the wooden cabinet near the wall with the horse picture?
+Answer: A mixer.
+Scene loaded: DNWbUAJYsPy
+Rare classes: ['couch', 'window frame', 'unknown', 'wall toilet paper', 'alarm clock', 'sofa seat', 'bed', 'telephone', 'wardrobe', 'laundry basket', 'shower floor', 'bathtub', 'bath faucet', 'soapbox', 'shower door', 'shower door frame', 'handbag', 'dumbbell', 'showerhead']
+Loaded 37 previously generated questions
+Cannot find a navigable point near the object 36: couch in distance 1.5!
+Cannot find a navigable point near the object 36: couch in distance 2.0!
+Cannot find a navigable point near the object 36: couch in distance 2.5!
+Cannot find a navigable point near the object 36: couch in distance 3.0!
+Cannot find a navigable point near the object 181: alarm clock in distance 1.5!
+Cannot find a navigable point near the object 181: alarm clock in distance 2.0!
+Cannot find a navigable point near the object 181: alarm clock in distance 2.5!
+Cannot find a navigable point near the object 181: alarm clock in distance 3.0!
+Cannot find a navigable point near the object 183: sofa seat in distance 1.5!
+Object id: 183, Class: sofa seat, View: 1 saved!
+Object id: 183, Class: sofa seat, View: 2 saved!
+Object id: 183, Class: sofa seat, View: 3 saved!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Is the lamp next to the blue sofa seat in the bedroom turned on?
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the lamp next to the blue sofa seat in the bedroom turned on?
+Answer: Yes.
+Cannot find a navigable point near the object 184: bed in distance 1.5!
+Cannot find a navigable point near the object 184: bed in distance 2.0!
+Cannot find a navigable point near the object 184: bed in distance 2.5!
+Cannot find a navigable point near the object 184: bed in distance 3.0!
+Object id: 190, Class: telephone, View: 0 saved!
+Cannot find a navigable point near the object 190: telephone in distance 2.0!
+Cannot find a navigable point near the object 190: telephone in distance 2.5!
+Cannot find a navigable point near the object 190: telephone in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: Is the telephone on the bedside table next to the bed in the bedroom properly placed?
+
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the telephone on the bedside table next to the bed in the bedroom properly placed?
+Answer: Yes.
+Cannot find a navigable point near the object 221: wardrobe in distance 1.5!
+Cannot find a navigable point near the object 221: wardrobe in distance 2.0!
+Cannot find a navigable point near the object 221: wardrobe in distance 2.5!
+Cannot find a navigable point near the object 221: wardrobe in distance 3.0!
+Cannot find a navigable point near the object 245: laundry basket in distance 1.5!
+Object id: 245, Class: laundry basket, View: 1 saved!
+Cannot find a navigable point near the object 245: laundry basket in distance 2.5!
+Cannot find a navigable point near the object 245: laundry basket in distance 3.0!
+HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
+Output: Question: What is next to the laundry basket near the doorway in the bedroom?
+
+Answer: A black cabinet with a television on top.
+Cateogry: spatial_understanding
+Question: What is next to the laundry basket near the doorway in the bedroom?
+Answer: A black cabinet with a television on top.
+Cannot find a navigable point near the object 291: bathtub in distance 1.5!
+Cannot find a navigable point near the object 291: bathtub in distance 2.0!
+Cannot find a navigable point near the object 291: bathtub in distance 2.5!
+Cannot find a navigable point near the object 291: bathtub in distance 3.0!
+Cannot find a navigable point near the object 292: bath faucet in distance 1.5!
+Cannot find a navigable point near the object 292: bath faucet in distance 2.0!
+Cannot find a navigable point near the object 292: bath faucet in distance 2.5!
+Cannot find a navigable point near the object 292: bath faucet in distance 3.0!
+Cannot find a navigable point near the object 293: soapbox in distance 1.5!
+Cannot find a navigable point near the object 293: soapbox in distance 2.0!
+Cannot find a navigable point near the object 293: soapbox in distance 2.5!
+Cannot find a navigable point near the object 293: soapbox in distance 3.0!
+Cannot find a navigable point near the object 303: handbag in distance 1.5!
+Cannot find a navigable point near the object 303: handbag in distance 2.0!
+Cannot find a navigable point near the object 303: handbag in distance 2.5!
+Cannot find a navigable point near the object 303: handbag in distance 3.0!
+Cannot find a navigable point near the object 315: dumbbell in distance 1.5!
+Cannot find a navigable point near the object 315: dumbbell in distance 2.0!
+Cannot find a navigable point near the object 315: dumbbell in distance 2.5!
+Cannot find a navigable point near the object 315: dumbbell in distance 3.0!

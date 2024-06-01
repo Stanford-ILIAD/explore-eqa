@@ -1,0 +1,802 @@
+[
+    {
+        "question_id": "00324-DoSbsoo4EAg_70_shower tub_933066",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "attribute recognition",
+        "question": "What is the pattern of the tiles surrounding the shower tub that is next to the toilet and vanity?",
+        "answer": "The tiles have a horizontal striped pattern in shades of gray and white.",
+        "object_id": 70,
+        "class": "shower tub",
+        "position": [
+            2.006499767303467,
+            0.08375927805900574,
+            6.382257461547852
+        ],
+        "rotation": [
+            0.0,
+            -0.6687833601887193,
+            0.0,
+            0.7434573404941844
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_74_bath sink_461228",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "spatial understanding",
+        "question": "What is directly above the bath sink in the bathroom?",
+        "answer": "A mirror.",
+        "object_id": 74,
+        "class": "bath sink",
+        "position": [
+            1.7635033130645752,
+            0.08375927805900574,
+            7.915600776672363
+        ],
+        "rotation": [
+            0.0,
+            -0.18683127338896902,
+            0.0,
+            0.9823920171112224
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_199_armchair_748184",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "spatial understanding",
+        "question": "What is behind the armchair near the window in the living room?",
+        "answer": "A floor lamp.",
+        "object_id": 199,
+        "class": "armchair",
+        "position": [
+            -2.7757680416107178,
+            0.08375927805900574,
+            7.7180352210998535
+        ],
+        "rotation": [
+            0.0,
+            -0.9998811763949904,
+            0.0,
+            0.01541535244476366
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_222_microwave_862694",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "attribute recognition",
+        "question": "What is the color of the microwave that is mounted above the kitchen counter near the stove?",
+        "answer": "Black and silver.",
+        "object_id": 222,
+        "class": "microwave",
+        "position": [
+            -4.564622402191162,
+            0.08375927805900574,
+            6.314593315124512
+        ],
+        "rotation": [
+            0.0,
+            0.415137331250239,
+            0.0,
+            0.9097587571452277
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_225_refrigerator_692944",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "object state recognition",
+        "question": "Is the refrigerator in the kitchen closed?",
+        "answer": "Yes.",
+        "object_id": 225,
+        "class": "refrigerator",
+        "position": [
+            -1.1395845413208008,
+            0.08375927805900574,
+            7.847172737121582
+        ],
+        "rotation": [
+            0.0,
+            0.4016512291839534,
+            0.0,
+            0.9157927113135479
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_230_dishwasher_890291",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "spatial understanding",
+        "question": "What is to the right of the dishwasher in the kitchen?",
+        "answer": "A stove.",
+        "object_id": 230,
+        "class": "dishwasher",
+        "position": [
+            -4.482060432434082,
+            0.08375927805900574,
+            9.339299201965332
+        ],
+        "rotation": [
+            0.0,
+            0.30296557756031045,
+            0.0,
+            0.9530014999009957
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_231_oven and stove_83857",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "object recognition",
+        "question": "What is the object located between the countertop and the refrigerator in the kitchen?",
+        "answer": "An oven and stove.",
+        "object_id": 231,
+        "class": "oven and stove",
+        "position": [
+            -6.422368049621582,
+            0.08375927805900574,
+            7.955533027648926
+        ],
+        "rotation": [
+            0.0,
+            -0.3049363739960867,
+            0.0,
+            0.9523727252573536
+        ]
+    },
+    {
+        "question_id": "00324-DoSbsoo4EAg_240_cutting board_725348",
+        "episode_history": "00324-DoSbsoo4EAg",
+        "category": "object localization",
+        "question": "Where is the cutting board in the kitchen?",
+        "answer": "The cutting board is on the kitchen counter, next to the knife block and near the refrigerator.",
+        "object_id": 240,
+        "class": "cutting board",
+        "position": [
+            -4.795924186706543,
+            0.08375927805900574,
+            6.408726692199707
+        ],
+        "rotation": [
+            0.0,
+            -0.38538817024868816,
+            0.0,
+            0.922754549288362
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_7_flower_554146",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the object placed on the counter next to the toilet in the bathroom?",
+        "answer": "A flower.",
+        "object_id": 7,
+        "class": "flower",
+        "position": [
+            -5.565807342529297,
+            0.17746078968048096,
+            -6.0593581199646
+        ],
+        "rotation": [
+            0.0,
+            0.5524611613780052,
+            0.0,
+            0.8335386404773721
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_16_bath_676191",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the object located between the sink and the toilet in the bathroom?",
+        "answer": "A bath.",
+        "object_id": 16,
+        "class": "bath",
+        "position": [
+            -4.340868949890137,
+            0.12628206610679626,
+            -5.8501505851745605
+        ],
+        "rotation": [
+            0.0,
+            0.7122290947171436,
+            0.0,
+            0.7019470896288397
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_120_laptop_619912",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the laptop that is placed on the white table near the dual monitors?",
+        "answer": "Black.",
+        "object_id": 120,
+        "class": "laptop",
+        "position": [
+            -0.07151947915554047,
+            2.8644237518310547,
+            -5.738614082336426
+        ],
+        "rotation": [
+            0.0,
+            -0.7465769478428786,
+            0.0,
+            0.6652990763180208
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_137_exercise ball_975317",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the large blue object in the corner next to the basket and dresser?",
+        "answer": "An exercise ball.",
+        "object_id": 137,
+        "class": "exercise ball",
+        "position": [
+            -0.40789079666137695,
+            2.8644237518310547,
+            -5.302168846130371
+        ],
+        "rotation": [
+            0.0,
+            0.9689115792708103,
+            0.0,
+            0.24740725849284206
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_175_shower bench_766347",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object localization",
+        "question": "Where is the shower bench located?",
+        "answer": "The shower bench is in the corner of the tiled shower, below the showerhead and next to the glass door.",
+        "object_id": 175,
+        "class": "shower bench",
+        "position": [
+            0.5587652325630188,
+            2.922309160232544,
+            -1.9495782852172852
+        ],
+        "rotation": [
+            0.0,
+            -0.9403179414096199,
+            0.0,
+            0.3402971775715674
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_232_chest_956331",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the dark wooden object located at the foot of the bed in the bedroom?",
+        "answer": "A chest.",
+        "object_id": 232,
+        "class": "chest",
+        "position": [
+            0.11686713248491287,
+            2.8644237518310547,
+            -0.3310929238796234
+        ],
+        "rotation": [
+            0.0,
+            0.9468300566117358,
+            0.0,
+            0.3217341198825788
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_270_washing machine_509837",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "functional reasoning",
+        "question": "What can I use to wash my clothes?",
+        "answer": "The washing machine next to the dryer.",
+        "object_id": 270,
+        "class": "washing machine",
+        "position": [
+            3.5446219444274902,
+            -0.13557636737823486,
+            3.5166831016540527
+        ],
+        "rotation": [
+            0.0,
+            0.2933793635928583,
+            0.0,
+            0.9559961030348657
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_276_clothes dryer_481002",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "functional reasoning",
+        "question": "What can I use to dry my clothes after washing them?",
+        "answer": "The clothes dryer next to the washing machine.",
+        "object_id": 276,
+        "class": "clothes dryer",
+        "position": [
+            3.110264301300049,
+            -0.13557636737823486,
+            3.7425355911254883
+        ],
+        "rotation": [
+            0.0,
+            0.06663862070594935,
+            0.0,
+            0.9977771766433668
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_299_boiler_973492",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object localization",
+        "question": "Where is the boiler located?",
+        "answer": "The boiler is in the laundry room, next to the washing machine and dryer, near the doorway leading to the dining area.",
+        "object_id": 299,
+        "class": "boiler",
+        "position": [
+            3.708801746368408,
+            -0.13557636737823486,
+            2.0616204738616943
+        ],
+        "rotation": [
+            0.0,
+            0.5090341207850841,
+            0.0,
+            0.8607463411926631
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_319_rack_865692",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object localization",
+        "question": "Where is the wooden rack with the boxes on it?",
+        "answer": "The wooden rack with the boxes on it is in the garage, next to the bicycles and near the door leading to the other room.",
+        "object_id": 319,
+        "class": "rack",
+        "position": [
+            2.9695658683776855,
+            -0.13557636737823486,
+            2.420814037322998
+        ],
+        "rotation": [
+            0.0,
+            -0.49443771629723976,
+            0.0,
+            0.8692130605914584
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_368_icebox_523306",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the large white object on top of the cardboard box near the garage door?",
+        "answer": "An icebox.",
+        "object_id": 368,
+        "class": "icebox",
+        "position": [
+            3.791361093521118,
+            -0.13557636737823486,
+            4.34657621383667
+        ],
+        "rotation": [
+            0.0,
+            -0.9100026552770161,
+            0.0,
+            0.41460242086700366
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_421_shirt_740320",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "spatial understanding",
+        "question": "What is directly above the shirt hanging near the garage door?",
+        "answer": "A ladder.",
+        "object_id": 421,
+        "class": "shirt",
+        "position": [
+            2.4761505126953125,
+            -0.18000347912311554,
+            6.602252960205078
+        ],
+        "rotation": [
+            0.0,
+            0.7890786373717283,
+            0.0,
+            0.6142921976092294
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_433_cloth_140935",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object localization",
+        "question": "Where is the folded cloth stored in the garage?",
+        "answer": "The folded cloth is stored on top of a white bucket and a grey storage box, near the garage door and under a ladder.",
+        "object_id": 433,
+        "class": "cloth",
+        "position": [
+            3.4783666133880615,
+            -0.015570193529129028,
+            6.181677341461182
+        ],
+        "rotation": [
+            0.0,
+            0.7486417456028387,
+            0.0,
+            0.6629747632758993
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_438_grill_498666",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object localization",
+        "question": "Where is the grill stored in the garage?",
+        "answer": "The grill is stored in the garage, near the wall with various hanging items and tools, next to a wooden stool and under some blankets or covers.",
+        "object_id": 438,
+        "class": "grill",
+        "position": [
+            4.050508499145508,
+            -0.13557636737823486,
+            4.211088180541992
+        ],
+        "rotation": [
+            0.0,
+            0.7779837508023559,
+            0.0,
+            0.6282843969791847
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_509_iron board_489709",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "functional reasoning",
+        "question": "What can I use to iron my clothes?",
+        "answer": "The ironing board in the corner of the room.",
+        "object_id": 509,
+        "class": "iron board",
+        "position": [
+            5.488064765930176,
+            -0.13557636737823486,
+            -1.9848785400390625
+        ],
+        "rotation": [
+            0.0,
+            -0.9837917828814634,
+            0.0,
+            0.1793146060278207
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_606_cutting board_727769",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "functional reasoning",
+        "question": "What can I use to chop vegetables for dinner?",
+        "answer": "The cutting board on the kitchen counter.",
+        "object_id": 606,
+        "class": "cutting board",
+        "position": [
+            -1.3644428253173828,
+            0.06442362070083618,
+            -0.3571223020553589
+        ],
+        "rotation": [
+            0.0,
+            -0.1736501256454618,
+            0.0,
+            0.9848074095290485
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_612_coffee machine_720103",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What color is the coffee machine that is placed on the green marble countertop near the stove?",
+        "answer": "Black.",
+        "object_id": 612,
+        "class": "coffee machine",
+        "position": [
+            -0.5481895804405212,
+            0.06442362070083618,
+            0.018960222601890564
+        ],
+        "rotation": [
+            0.0,
+            -0.9023736311472207,
+            0.0,
+            0.43095455654880793
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_614_stove_633154",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the stove that is located between the dishwasher and the dining table area?",
+        "answer": "Stainless steel.",
+        "object_id": 614,
+        "class": "stove",
+        "position": [
+            -1.6722630262374878,
+            0.06442362070083618,
+            -1.0642621517181396
+        ],
+        "rotation": [
+            0.0,
+            -0.9632730862506744,
+            0.0,
+            0.26852366991589455
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_619_dishwasher_941158",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "functional reasoning",
+        "question": "What can I use to wash the dirty dishes quickly?",
+        "answer": "The dishwasher under the counter.",
+        "object_id": 619,
+        "class": "dishwasher",
+        "position": [
+            -2.0299057960510254,
+            0.06442362070083618,
+            -1.0291943550109863
+        ],
+        "rotation": [
+            0.0,
+            -0.8687145513173188,
+            0.0,
+            0.49531306093171995
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_623_wine cabinet_5052",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the countertop above the wine cabinet that is located near the staircase?",
+        "answer": "Green.",
+        "object_id": 623,
+        "class": "wine cabinet",
+        "position": [
+            -1.560033917427063,
+            0.06442362070083618,
+            0.8963157534599304
+        ],
+        "rotation": [
+            0.0,
+            -0.23303187914226317,
+            0.0,
+            0.9724690963230789
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_628_microwave_669809",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object state recognition",
+        "question": "Is the door of the microwave on the kitchen counter closed?",
+        "answer": "Yes.",
+        "object_id": 628,
+        "class": "microwave",
+        "position": [
+            -1.1040973663330078,
+            0.06442362070083618,
+            0.2173192799091339
+        ],
+        "rotation": [
+            0.0,
+            0.8485931589334735,
+            0.0,
+            0.5290459815661664
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_679_stand_772632",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the object on the desk near the window that holds various items?",
+        "answer": "A stand.",
+        "object_id": 679,
+        "class": "stand",
+        "position": [
+            -1.283717155456543,
+            0.06442362070083618,
+            -5.474084854125977
+        ],
+        "rotation": [
+            0.0,
+            0.1848348786162449,
+            0.0,
+            0.9827695903144938
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_682_printer_151576",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "spatial understanding",
+        "question": "What is to the right of the printer on the wooden desk near the window?",
+        "answer": "A black guitar case.",
+        "object_id": 682,
+        "class": "printer",
+        "position": [
+            -0.2933503985404968,
+            0.06442362070083618,
+            -5.2011895179748535
+        ],
+        "rotation": [
+            0.0,
+            -0.0008548685551303586,
+            0.0,
+            0.99999963459981
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_686_pc tower_3802",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object state recognition",
+        "question": "Is the PC tower under the wooden desk in the study room turned on?",
+        "answer": "No.",
+        "object_id": 686,
+        "class": "pc tower",
+        "position": [
+            -0.20161420106887817,
+            0.06442362070083618,
+            -5.2325310707092285
+        ],
+        "rotation": [
+            0.0,
+            0.20614457514834625,
+            0.0,
+            0.9785215450550426
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_720_flower vase_377783",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "spatial understanding",
+        "question": "What is hanging on the wall to the left of the flower vase on the wooden dresser?",
+        "answer": "A circular mirror with a decorative frame.",
+        "object_id": 720,
+        "class": "flower vase",
+        "position": [
+            -0.8876157999038696,
+            0.06442362070083618,
+            -5.425185203552246
+        ],
+        "rotation": [
+            0.0,
+            0.8232216357813784,
+            0.0,
+            0.5677201232838516
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_764_pouffe_740768",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the pouffe that is placed next to the armchair near the stone fireplace?",
+        "answer": "Dark gray.",
+        "object_id": 764,
+        "class": "pouffe",
+        "position": [
+            -7.4899444580078125,
+            -0.3355763852596283,
+            0.15163925290107727
+        ],
+        "rotation": [
+            0.0,
+            -0.9982232337972438,
+            0.0,
+            0.05958502754347434
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_795_tv_373206",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the TV that is placed near the staircase and below a wall painting?",
+        "answer": "Black.",
+        "object_id": 795,
+        "class": "tv",
+        "position": [
+            -3.5726513862609863,
+            0.06442362070083618,
+            1.2262591123580933
+        ],
+        "rotation": [
+            0.0,
+            0.36505773751038806,
+            0.0,
+            0.930984880803011
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_796_tv stand_774976",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "attribute recognition",
+        "question": "What is the color of the TV stand that is placed near the staircase and below the television?",
+        "answer": "Black.",
+        "object_id": 796,
+        "class": "tv stand",
+        "position": [
+            -6.2182936668396,
+            -0.3355763852596283,
+            1.2293457984924316
+        ],
+        "rotation": [
+            0.0,
+            -0.190643407075709,
+            0.0,
+            0.9816593560592012
+        ]
+    },
+    {
+        "question_id": "00606-W16Bm4ysK8v_853_mixer_512651",
+        "episode_history": "00606-W16Bm4ysK8v",
+        "category": "object recognition",
+        "question": "What is the silver object on the wooden cabinet near the wall with the horse picture?",
+        "answer": "A mixer.",
+        "object_id": 853,
+        "class": "mixer",
+        "position": [
+            -4.978628158569336,
+            0.06442362070083618,
+            -3.944760799407959
+        ],
+        "rotation": [
+            0.0,
+            -0.9711587305489711,
+            0.0,
+            0.23843389037322668
+        ]
+    },
+    {
+        "question_id": "00669-DNWbUAJYsPy_183_sofa seat_663788",
+        "episode_history": "00669-DNWbUAJYsPy",
+        "category": "object state recognition",
+        "question": "Is the lamp next to the blue sofa seat in the bedroom turned on?",
+        "answer": "Yes.",
+        "object_id": 183,
+        "class": "sofa seat",
+        "position": [
+            12.217523574829102,
+            0.07263270020484924,
+            2.519836664199829
+        ],
+        "rotation": [
+            0.0,
+            0.200062554594127,
+            0.0,
+            0.9797831261301003
+        ]
+    },
+    {
+        "question_id": "00669-DNWbUAJYsPy_190_telephone_354512",
+        "episode_history": "00669-DNWbUAJYsPy",
+        "category": "object state recognition",
+        "question": "Is the telephone on the bedside table next to the bed in the bedroom properly placed?",
+        "answer": "Yes.",
+        "object_id": 190,
+        "class": "telephone",
+        "position": [
+            10.321558952331543,
+            0.07263270020484924,
+            1.0967018604278564
+        ],
+        "rotation": [
+            0.0,
+            0.7405680506788154,
+            0.0,
+            0.6719813705109536
+        ]
+    },
+    {
+        "question_id": "00669-DNWbUAJYsPy_245_laundry basket_338096",
+        "episode_history": "00669-DNWbUAJYsPy",
+        "category": "spatial understanding",
+        "question": "What is next to the laundry basket near the doorway in the bedroom?",
+        "answer": "A black cabinet with a television on top.",
+        "object_id": 245,
+        "class": "laundry basket",
+        "position": [
+            8.134953498840332,
+            0.07263270020484924,
+            2.3806042671203613
+        ],
+        "rotation": [
+            0.0,
+            -0.5999594713505498,
+            0.0,
+            0.8000303948830749
+        ]
+    }
+]
