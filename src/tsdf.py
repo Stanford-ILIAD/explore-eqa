@@ -2,6 +2,7 @@
 # Copyright (c) 2018 Andy Zeng
 # Source: https://github.com/andyzeng/tsdf-fusion-python/blob/master/fusion.py
 # BSD 2-Clause License
+import copy
 
 # Copyright (c) 2019, Princeton University
 # All rights reserved.
@@ -43,6 +44,7 @@ from .geom import (
     rigid_transform,
     run_dijkstra,
     fps,
+    get_nearest_true_point
 )
 from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
@@ -65,6 +67,13 @@ class Frontier:
         # two frontiers are equal if they have the same position, and their orientations are close
         return (np.array_equal(self.position, other.position) and
                 np.dot(self.orientation, other.orientation) / (np.linalg.norm(self.orientation) * np.linalg.norm(other.orientation)) > 0.9)
+
+
+@dataclass
+class Object:
+    """Object class for semantic objects."""
+
+    position: np.ndarray  # integer position in voxel grid
 
 
 class TSDFPlanner:
@@ -153,24 +162,27 @@ class TSDFPlanner:
         )
 
         self.target_point = None
+        self.target_direction = None
+        self.max_point = None
         self.simple_scene_graph = {}
         self.frontiers: List[Frontier] = []
 
-    def increment_scene_graph(self, semantic_obs, gt_scene):
+    def increment_scene_graph(self, semantic_obs, obj_id_to_bbox, min_pix_ratio=0.0):
         unique_semantic_ids = np.unique(semantic_obs)
-        for i in range(len(unique_semantic_ids)):
-            if unique_semantic_ids[i] not in self.simple_scene_graph.keys() and unique_semantic_ids[i] != 0:
-                items = [d for d in gt_scene if int(d["id"]) == int(unique_semantic_ids[i])]
-                if len(items) == 0:
+        for obj_id in unique_semantic_ids:
+            if obj_id not in self.simple_scene_graph.keys() and obj_id != 0 and obj_id in obj_id_to_bbox.keys():
+                bbox_data = obj_id_to_bbox[obj_id]
+                if bbox_data['class'] in ["wall", "floor", "ceiling"]:
                     continue
-                if len(items[0]["class_name"]) in ["wall", "floor", "ceiling"]:
+                if np.sum(semantic_obs == obj_id) / (semantic_obs.shape[0] * semantic_obs.shape[1]) < min_pix_ratio:
                     continue
-                bbox = items[0]["bbox"]
-                x = (bbox[0][0] + bbox[1][0]) / 2
-                y = (bbox[0][1] + bbox[1][1]) / 2
-                z = (bbox[0][2] + bbox[1][2]) / 2
-                pt = np.dot((x, z, y), np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]))
-                self.simple_scene_graph[unique_semantic_ids[i]] = pt
+                bbox = bbox_data["bbox"]
+                bbox = np.asarray(bbox)
+                bbox_center = np.mean(bbox, axis=0)
+                # change to x, z, y for habitat
+                bbox_center = bbox_center[[0, 2, 1]]
+                # add to simple scene graph
+                self.simple_scene_graph[obj_id] = bbox_center
 
     @staticmethod
     @njit(parallel=True)
@@ -592,6 +604,7 @@ class TSDFPlanner:
         angle,
         path_points,
         pathfinder,
+        target_obj_id,
         flag_no_val_weight=False,
         unexplored_T=0.5,
         unoccupied_T=3,
@@ -639,7 +652,7 @@ class TSDFPlanner:
         # smoothen the map
         val_vol_2d = gaussian_filter(val_vol_2d, sigma=smooth_sigma)
 
-        # use nonzero_val_vol quantile for frontier normalization
+        # detect and update frontiers
         frontiers_regions = np.argwhere(
             island
             & (unexplored_neighbors >= frontier_min_neighbors)
@@ -680,21 +693,12 @@ class TSDFPlanner:
                 continue
 
             # the orientation of the frontier the average of the vector from agent to each point in the cluster
-            direction = np.mean(cluster - cur_point[:2], axis=0)
-            direction = direction / np.linalg.norm(direction)
+            ft_direction = np.mean(cluster - cur_point[:2], axis=0)
+            ft_direction = ft_direction / np.linalg.norm(ft_direction)
 
             frontier_list.append(
-                Frontier(center, direction, None, area)
+                Frontier(center, ft_direction, None, area)
             )
-
-        # remove keys in self.frontiers if not in frontiers
-        # frontier_keys = [tuple(frontier.position) for frontier in frontier_list]
-        # for key in self.frontiers.keys():
-        #     if key not in frontier_keys:
-        #         del self.frontiers[key]
-        # for frontier in frontier_list:
-        #     if tuple(frontier.position) not in self.frontiers.keys():
-        #         self.frontiers[tuple(frontier.position)] = frontier
 
         # remove frontiers that did not appear in current observation
         self.frontiers = [frontier for frontier in self.frontiers if any(frontier == curr_ft for curr_ft in frontier_list)]
@@ -706,14 +710,24 @@ class TSDFPlanner:
         # subsample
         frontiers_weight = np.zeros((len(self.frontiers)))
 
-        # Commit
-        point_type = "current"
-        if self.target_point is None:
+        # determine whether the target object is in scene graph
+        if target_obj_id in self.simple_scene_graph.keys():
+            target_point = self.habitat2voxel(self.simple_scene_graph[target_obj_id])[:2]
+            # set the object center as the navigation target
+            target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
+            if target_navigable_point is None:
+                # a wierd case that no unoccupied point is found in all the space
+                raise ValueError("No unoccupied point is found in the scene")
+            self.target_point = target_navigable_point
+            self.max_point = Object(target_point.astype(int))
+            logging.info(f"Target point found: {target_point}")
 
+        # if target point is not found, find the next frontier
+        if self.target_point is None:
+            point_type = "current"
             # Get weights for frontiers
             frontiers_weight = np.empty(0)
             for frontier in self.frontiers:
-
                 # find normal of the frontier
                 normal = frontier.orientation
 
@@ -788,7 +802,7 @@ class TSDFPlanner:
                 frontiers_weight = np.append(frontiers_weight, weight)
             logging.info(f"Number of frontiers for next pose: {len(self.frontiers)}")
 
-            # raise frontier value if there is frontier
+            # choose the frontier with highest weight
             if len(self.frontiers) > 0:
                 logging.info(
                     f"Mean and std of frontier weight: {np.mean(frontiers_weight):.3f},"
@@ -817,7 +831,7 @@ class TSDFPlanner:
                     max_point = self.frontiers[frontier_ind]
 
                     # find the direction into unexplored
-                    direction = max_point.orientation
+                    ft_direction = max_point.orientation
 
                     # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
                     # there is a chance that the point is outside the free space
@@ -829,7 +843,7 @@ class TSDFPlanner:
                     clearance = 0
                     # traverse all the backtrack points, and find the valid point with the largest clearance ahead
                     while num_backtrack < max_backtrack:
-                        next_point -= direction
+                        next_point -= ft_direction
                         num_backtrack += 1
 
                         # if the point is invalid
@@ -861,42 +875,17 @@ class TSDFPlanner:
             if point_type == "current":
                 logging.info("No patches, return current point and random direction")
                 next_point = cur_point[:2]
-                direction = np.random.rand(2) - 0.5
-                direction = direction / np.linalg.norm(direction)
-                max_point = Frontier(cur_point[:2].astype(np.int32), direction, None, area=0)
-        else:
+                max_point = Object(next_point.astype(int))
+        else:  # target point is found, then go directly to the target point
             point_type = "commit"
             next_point = self.target_point.copy()
-            direction = self.target_direction.copy()
-            max_point = self.max_point.copy()
+            max_point = copy.deepcopy(self.max_point)
         logging.info(f"Next pose type: {point_type}")
 
-        # Check if the point is beyond the max dist. Note that not using dist from dijkstra for saving time, then not taking account into obstacles when calculating distance
-        # dist = np.sqrt(
-        #     (next_point[0] - cur_point[0]) ** 2 + (next_point[1] - cur_point[1]) ** 2
-        # )
-        # if dist > max_dist_from_cur / self._voxel_size:
-        #     self.target_point = next_point.copy()
-        #     self.target_direction = direction.copy()
-        #     self.max_point = max_point.copy()
-        #
-        #     island_free = np.logical_not(island)  # 0 for free
-        #     path = run_dijkstra(island_free, cur_point, next_point)
-        #     max_num = min(int(max_dist_from_cur / self._voxel_size), len(path) - 1)
-        #     next_point = np.array(path[max_num])
-        #     direction = max_point - next_point  # direction to the max point
-        #     direction = direction / np.linalg.norm(direction)
-        #     logging.info(
-        #         f"Current {cur_point[:2]}, target {self.target_point}, move to"
-        #         f" {next_point}"
-        #     )
-        # if dist <= max_dist_from_cur / self._voxel_size or max_num == len(path) - 1:
-        #     self.target_point = None
-        #     self.target_direction = None
-        #     self.max_point = None
-
-        # another check of the distance to next navigation point
-        dist, path_to_target = self.get_distance(cur_point[:2], next_point, pts[2], pathfinder)
+        # check the distance to next navigation point
+        # if the target navigation point is too far
+        # then just go to a point between the current point and the target point
+        dist, path_to_target = self.get_distance(cur_point[:2], next_point, height=pts[2], pathfinder=pathfinder)
         if dist > max_dist_from_cur:
             if path_to_target is not None:
                 # if the pathfinder find a path, then just walk along the path for max_dist_from_cur distance
@@ -924,6 +913,18 @@ class TSDFPlanner:
                     next_point -= walk_dir * 0.3 / self._voxel_size
                 next_point = np.round(next_point).astype(int)
 
+        # determine the direction: from next point to max point
+        if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
+            # this case should not happen actually, since the exploration should end before this
+            if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
+                # then just set some random direction
+                direction = np.random.randn(2)
+            else:
+                direction = max_point.position - cur_point[:2]
+        else:
+            # normal direction from next point to max point
+            direction = max_point.position - next_point
+        direction = direction / np.linalg.norm(direction)
 
         # Plot
         fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
@@ -933,6 +934,13 @@ class TSDFPlanner:
         ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
         ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
         ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+        # plot all the detected objects
+        for obj_center in self.simple_scene_graph.values():
+            obj_vox = self.habitat2voxel(obj_center)
+            ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
+        # plot the target point if found
+        if self.target_point is not None:
+            ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
         ax1.set_title("Unoccupied")
 
         ax2.imshow(island)

@@ -1,5 +1,5 @@
 # General
-seed: 42
+seed: 24
 exp_name: vlm_exp_frontiers
 output_parent_dir: results
 question_data_path: "generated_questions"
@@ -18,6 +18,11 @@ margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
 save_obs: true
+save_frontier: false
+
+# Stop criteria
+stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
+stop_max_bias_from_center: 0.4  # the target object should be within 40% of the image center
 
 # Navigation
 init_clearance: 0.5
@@ -26,6 +31,9 @@ black_pixel_ratio: 0.5
 min_random_init_steps: 2
 extra_view: 2
 extra_view_angle_deg: 120
+
+# Scene graph
+min_pix_ratio: 0.005
 
 # Semantic map
 use_active: true
@@ -44,7 +52,7 @@ planner:
   eps: 1
   min_dist_from_cur: 0.5
   max_dist_from_cur: 1
-  frontier_spacing: 1.5
+  frontier_spacing: 0.5
   frontier_min_neighbors: 8
   frontier_max_neighbors: 9
   max_unexplored_check_frontier: 3

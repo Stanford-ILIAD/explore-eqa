@@ -285,3 +285,54 @@ def pcwrite(filename, xyzrgb):
                 rgb[i, 2],
             )
         )
+
+
+def get_nearest_true_point(point, bool_map):
+    """
+    point: [2] array
+    bool_map: [H, W] boolean array
+    """
+    H, W = bool_map.shape
+    x, y = point
+    x, y = int(x), int(y)
+    if bool_map[x, y]:
+        return point
+    if x < 0 or x >= H or y < 0 or y >= W:
+        return None
+    horizontal_found = False
+    for i in range(1, max(H, W)):
+        for j in range(i + 1):
+            for dx, dy in [(j, i), (j, -i), (-j, i), (-j, -i)]:
+                if 0 <= x + dx < H and 0 <= y + dy < W and bool_map[x + dx, y + dy]:
+                    horizontal_found = True
+                    break
+            if horizontal_found:
+                break
+        if horizontal_found:
+            break
+
+    dx_horizon, dy_horizon = dx, dy
+    vertical_found = False
+    for i in range(1, max(H, W)):
+        for j in range(i + 1):
+            for dx, dy in [(i, j), (-i, j), (i, -j), (-i, -j)]:
+                if 0 <= x + dx < H and 0 <= y + dy < W and bool_map[x + dx, y + dy]:
+                    vertical_found = True
+                    break
+            if vertical_found:
+                break
+        if vertical_found:
+            break
+    dx_vertical, dy_vertical = dx, dy
+
+    if not horizontal_found and not vertical_found:
+        return None
+    elif not horizontal_found:
+        return np.array([x + dx_vertical, y + dy_vertical])
+    elif not vertical_found:
+        return np.array([x + dx_horizon, y + dy_horizon])
+    else:
+        if dx_horizon ** 2 + dy_horizon ** 2 < dx_vertical ** 2 + dy_vertical ** 2:
+            return np.array([x + dx_horizon, y + dy_horizon])
+        else:
+            return np.array([x + dx_vertical, y + dy_vertical])

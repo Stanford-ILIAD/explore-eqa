@@ -55,6 +55,9 @@ def main(cfg):
     for scene_id in all_scene_list:
         all_questions_in_scene = [q for q in questions_data if q["episode_history"] == scene_id]
 
+        rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
+        all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
+
         # load scene
         split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
         scene_mesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.glb")
@@ -88,7 +91,7 @@ def main(cfg):
 
         # load semantic object bbox data
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
-        object_id_to_bbox = {int(item['id']): item['bbox'] for item in bounding_box_data}
+        object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         #
         # # Load the semantic annotation
         # obj_id_to_class = {}
@@ -154,6 +157,7 @@ def main(cfg):
             logging.info(f'Question id {question_data["question_id"]} finish initialization')
 
             # run steps
+            target_found = False
             for cnt_step in range(num_step):
                 logging.info(f"\n== step: {cnt_step}")
 
@@ -190,21 +194,35 @@ def main(cfg):
                     depth = obs["depth_sensor"]
                     semantic_obs = obs["semantic_sensor"]
 
+                    # check stop condition
+                    target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
+                    if target_obj_pix_ratio > 0:
+                        obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
+                        bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                        if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.all(np.abs(bias_from_center) < cfg.stop_max_bias_from_center):
+                            logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
+                            target_found = True
+
                     # construct an frequency count map of each semantic id to a unique id
-                    masked_ids = np.unique(semantic_obs[depth > 3.0])
+                    masked_ids = np.unique(semantic_obs[depth > 5.0])
                     semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
-                    tsdf_planner.increment_scene_graph(semantic_obs, bounding_box_data)
+                    tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
                     if cfg.save_obs:
-                        plt.imsave(
-                            os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb
-                        )
+                        if target_found:
+                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), rgb)
+                        else:
+                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb)
                         semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
                         semantic_img.putpalette(d3_40_colors_rgb.flatten())
                         semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
                         semantic_img = semantic_img.convert("RGBA")
-                        semantic_img.save(
-                            os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png")
-                        )
+                        if target_found:
+                            semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
+                        else:
+                            semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
+
+                    if target_found:
+                        break
 
                     num_black_pixels = np.sum(np.sum(rgb, axis=-1) == 0)  # sum over channel first
                     if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
@@ -220,74 +238,77 @@ def main(cfg):
                         )
 
                         # Get VLM prediction
-                        rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
+                        # rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
+                        #
+                        # # Get frontier candidates
+                        # prompt_points_pix = []
+                        # if cfg.use_active:
+                        #     prompt_points_pix, fig = (
+                        #         tsdf_planner.find_prompt_points_within_view(
+                        #             pts_normal,
+                        #             img_width,
+                        #             img_height,
+                        #             cam_intr,
+                        #             cam_pose_tsdf,
+                        #             **cfg.visual_prompt,
+                        #         )
+                        #     )
+                        #     fig.tight_layout()
+                        #     plt.savefig(
+                        #         os.path.join(
+                        #             episode_data_dir, "{}_prompt_points.png".format(cnt_step)
+                        #         )
+                        #     )
+                        #     plt.close()
+                        #
+                        # # Visual prompting
+                        # draw_letters = ["1", "2", "3", "4"]  # always four
+                        # fnt = ImageFont.truetype(
+                        #     "data/Open_Sans/static/OpenSans-Regular.ttf",
+                        #     30,
+                        # )
+                        # actual_num_prompt_points = len(prompt_points_pix)
+                        # # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
+                        # if True:
+                        #     rgb_im_draw = rgb_im.copy()
+                        #     draw = ImageDraw.Draw(rgb_im_draw)
+                        #     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                        #         draw.text(
+                        #             tuple(point_pix.astype(int).tolist()),
+                        #             draw_letters[prompt_point_ind],
+                        #             font=fnt,
+                        #             fill=(255, 0, 0, 255),
+                        #             anchor="mm",
+                        #             font_size=15,
+                        #         )
+                        #
+                        #     rgb_im_draw.save(
+                        #         os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
+                        #     )
+                        #
+                        #     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                        #         # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
+                        #         width = 640
+                        #         height = 480
+                        #         size = 100
+                        #         rgb_im_draw_cropped = rgb_im.crop(
+                        #             (
+                        #                 max(point_pix[0] - size, 0),
+                        #                 max(point_pix[1] - size, 0),
+                        #                 min(point_pix[0] + size, width),
+                        #                 min(point_pix[1] + size, height),
+                        #             )
+                        #         )
+                        #         rgb_im_draw_cropped.save(
+                        #             os.path.join(
+                        #                 episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
+                        #             )
+                        #         )
+                        #
+                        #     logging.info(f"Figure saved")
 
-                        # Get frontier candidates
-                        prompt_points_pix = []
-                        if cfg.use_active:
-                            prompt_points_pix, fig = (
-                                tsdf_planner.find_prompt_points_within_view(
-                                    pts_normal,
-                                    img_width,
-                                    img_height,
-                                    cam_intr,
-                                    cam_pose_tsdf,
-                                    **cfg.visual_prompt,
-                                )
-                            )
-                            fig.tight_layout()
-                            plt.savefig(
-                                os.path.join(
-                                    episode_data_dir, "{}_prompt_points.png".format(cnt_step)
-                                )
-                            )
-                            plt.close()
-
-                        # Visual prompting
-                        draw_letters = ["1", "2", "3", "4"]  # always four
-                        fnt = ImageFont.truetype(
-                            "data/Open_Sans/static/OpenSans-Regular.ttf",
-                            30,
-                        )
-                        actual_num_prompt_points = len(prompt_points_pix)
-                        # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
-                        if True:
-                            rgb_im_draw = rgb_im.copy()
-                            draw = ImageDraw.Draw(rgb_im_draw)
-                            for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                                draw.text(
-                                    tuple(point_pix.astype(int).tolist()),
-                                    draw_letters[prompt_point_ind],
-                                    font=fnt,
-                                    fill=(255, 0, 0, 255),
-                                    anchor="mm",
-                                    font_size=15,
-                                )
-
-                            rgb_im_draw.save(
-                                os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
-                            )
-
-                            for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                                # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
-                                width = 640
-                                height = 480
-                                size = 100
-                                rgb_im_draw_cropped = rgb_im.crop(
-                                    (
-                                        max(point_pix[0] - size, 0),
-                                        max(point_pix[1] - size, 0),
-                                        min(point_pix[0] + size, width),
-                                        min(point_pix[1] + size, height),
-                                    )
-                                )
-                                rgb_im_draw_cropped.save(
-                                    os.path.join(
-                                        episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
-                                    )
-                                )
-
-                            logging.info(f"Figure saved")
+                if target_found:
+                    break
 
                 # determine the next point and move the agent
                 pts_normal, angle, pts_pix, fig, path_points = tsdf_planner.find_next_pose_with_path(
@@ -295,37 +316,38 @@ def main(cfg):
                     angle=angle,
                     path_points=path_points,
                     pathfinder=pathfinder,
+                    target_obj_id=target_obj_id,
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                     **cfg.planner,
                 )
-
-                # Turn to face each frontier point and get rgb image
-                print(f"Num Frontiers: {len(tsdf_planner.frontiers)}")
-                for i, frontier in enumerate(tsdf_planner.frontiers):
-                    pos_voxel = frontier.position
-                    pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
-                    pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
-                    if frontier.image is not None:
-                        original_path = os.path.join(episode_frontier_dir, frontier.image)
-                        if os.path.exists(original_path):
-                            target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
-                            os.system(f"cp {original_path} {target_path}")
-                    else:
-                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                        default_view_direction = np.asarray([0., 0., -1.])
-                        agent_state.rotation = quat_to_coeffs(
-                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                        ).tolist()
-                        agent.set_state(agent_state)
-                        # Get observation at current pose - skip black image, meaning robot is outside the floor
-                        obs = simulator.get_sensor_observations()
-                        rgb = obs["color_sensor"]
-                        plt.imsave(
-                            os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png"),
-                            rgb,
-                        )
-                        frontier.image = f"{cnt_step}_frontier_{i}.png"
+                if cfg.save_frontier:
+                    # Turn to face each frontier point and get rgb image
+                    print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
+                    for i, frontier in enumerate(tsdf_planner.frontiers):
+                        pos_voxel = frontier.position
+                        pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                        pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                        if frontier.image is not None:
+                            original_path = os.path.join(episode_frontier_dir, frontier.image)
+                            if os.path.exists(original_path):
+                                target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
+                                os.system(f"cp {original_path} {target_path}")
+                        else:
+                            view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                            default_view_direction = np.asarray([0., 0., -1.])
+                            agent_state.rotation = quat_to_coeffs(
+                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                            ).tolist()
+                            agent.set_state(agent_state)
+                            # Get observation at current pose - skip black image, meaning robot is outside the floor
+                            obs = simulator.get_sensor_observations()
+                            rgb = obs["color_sensor"]
+                            plt.imsave(
+                                os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png"),
+                                rgb,
+                            )
+                            frontier.image = f"{cnt_step}_frontier_{i}.png"
 
                 # update the agent's position record
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
