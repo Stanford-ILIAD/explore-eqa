@@ -21,23 +21,23 @@ Cannot find a navigable point near the object 70: shower tub in distance 2.0!
 Cannot find a navigable point near the object 70: shower tub in distance 2.5!
 Object id: 70, Class: shower tub, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the pattern of the tiles surrounding the shower tub that is next to the toilet and vanity?
+Output: Question: What is the object located inside the glass enclosure in the bathroom?
 
-Answer: The tiles have a horizontal striped pattern in shades of gray and white.
-Cateogry: attribute_recognition
-Question: What is the pattern of the tiles surrounding the shower tub that is next to the toilet and vanity?
-Answer: The tiles have a horizontal striped pattern in shades of gray and white.
+Answer: A shower tub.
+Cateogry: object_recognition
+Question: What is the object located inside the glass enclosure in the bathroom?
+Answer: A shower tub.
 Cannot find a navigable point near the object 74: bath sink in distance 1.5!
 Cannot find a navigable point near the object 74: bath sink in distance 2.0!
 Object id: 74, Class: bath sink, View: 2 saved!
 Object id: 74, Class: bath sink, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is directly above the bath sink in the bathroom?
+Output: Question: What is the color pattern of the bath sink that is located below the mirror in the bathroom with striped tiles?
 
-Answer: A mirror.
-Cateogry: spatial_understanding
-Question: What is directly above the bath sink in the bathroom?
-Answer: A mirror.
+Answer: The bath sink is white with horizontal black stripes.
+Cateogry: attribute_recognition
+Question: What is the color pattern of the bath sink that is located below the mirror in the bathroom with striped tiles?
+Answer: The bath sink is white with horizontal black stripes.
 Cannot find a navigable point near the object 75: toilet paper in distance 1.5!
 Cannot find a navigable point near the object 75: toilet paper in distance 2.0!
 Cannot find a navigable point near the object 75: toilet paper in distance 2.5!
@@ -55,12 +55,12 @@ Object id: 199, Class: armchair, View: 1 saved!
 Object id: 199, Class: armchair, View: 2 saved!
 Object id: 199, Class: armchair, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is behind the armchair near the window in the living room?
+Output: Question: Is there a cushion on the armchair in front of the window in the living room?
 
-Answer: A floor lamp.
-Cateogry: spatial_understanding
-Question: What is behind the armchair near the window in the living room?
-Answer: A floor lamp.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is there a cushion on the armchair in front of the window in the living room?
+Answer: Yes.
 Cannot find a navigable point near the object 213: couch in distance 1.5!
 Cannot find a navigable point near the object 213: couch in distance 2.0!
 Cannot find a navigable point near the object 213: couch in distance 2.5!
@@ -70,23 +70,23 @@ Cannot find a navigable point near the object 222: microwave in distance 2.0!
 Cannot find a navigable point near the object 222: microwave in distance 2.5!
 Cannot find a navigable point near the object 222: microwave in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the microwave that is mounted above the kitchen counter near the stove?
+Output: Question: What can I use to quickly heat up my food?
 
-Answer: Black and silver.
-Cateogry: attribute_recognition
-Question: What is the color of the microwave that is mounted above the kitchen counter near the stove?
-Answer: Black and silver.
+Answer: The microwave on the shelf above the counter.
+Cateogry: functional_reasoning
+Question: What can I use to quickly heat up my food?
+Answer: The microwave on the shelf above the counter.
 Cannot find a navigable point near the object 225: refrigerator in distance 1.5!
 Cannot find a navigable point near the object 225: refrigerator in distance 2.0!
 Cannot find a navigable point near the object 225: refrigerator in distance 2.5!
 Object id: 225, Class: refrigerator, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Is the refrigerator in the kitchen closed?
+Output: Question: What is to the left of the refrigerator in the kitchen?
 
-Answer: Yes.
-Cateogry: object_state_recognition
-Question: Is the refrigerator in the kitchen closed?
-Answer: Yes.
+Answer: A stove with an oven.
+Cateogry: spatial_understanding
+Question: What is to the left of the refrigerator in the kitchen?
+Answer: A stove with an oven.
 Cannot find a navigable point near the object 226: range hood in distance 1.5!
 Cannot find a navigable point near the object 226: range hood in distance 2.0!
 Cannot find a navigable point near the object 226: range hood in distance 2.5!
@@ -96,22 +96,22 @@ Object id: 230, Class: dishwasher, View: 1 saved!
 Object id: 230, Class: dishwasher, View: 2 saved!
 Object id: 230, Class: dishwasher, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is to the right of the dishwasher in the kitchen?
+Output: Question: Where is the dishwasher located in the kitchen?
 
-Answer: A stove.
-Cateogry: spatial_understanding
-Question: What is to the right of the dishwasher in the kitchen?
-Answer: A stove.
+Answer: The dishwasher is located in the kitchen, next to the sink and below the countertop, near the window with a view of the city.
+Cateogry: object_localization
+Question: Where is the dishwasher located in the kitchen?
+Answer: The dishwasher is located in the kitchen, next to the sink and below the countertop, near the window with a view of the city.
 Cannot find a navigable point near the object 231: oven and stove in distance 1.5!
 Object id: 231, Class: oven and stove, View: 1 saved!
 Object id: 231, Class: oven and stove, View: 2 saved!
 Object id: 231, Class: oven and stove, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the object located between the countertop and the refrigerator in the kitchen?
+Output: Question: What is the object located between the countertop and the range hood in the kitchen?
 
 Answer: An oven and stove.
 Cateogry: object_recognition
-Question: What is the object located between the countertop and the refrigerator in the kitchen?
+Question: What is the object located between the countertop and the range hood in the kitchen?
 Answer: An oven and stove.
 Cannot find a navigable point near the object 235: toaster in distance 1.5!
 Cannot find a navigable point near the object 235: toaster in distance 2.0!
@@ -130,12 +130,12 @@ Cannot find a navigable point near the object 240: cutting board in distance 2.0
 Cannot find a navigable point near the object 240: cutting board in distance 2.5!
 Cannot find a navigable point near the object 240: cutting board in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the cutting board in the kitchen?
+Output: Question: What is the color of the cutting board that is placed next to the knife block on the kitchen counter near the stove?
 
-Answer: The cutting board is on the kitchen counter, next to the knife block and near the refrigerator.
-Cateogry: object_localization
-Question: Where is the cutting board in the kitchen?
-Answer: The cutting board is on the kitchen counter, next to the knife block and near the refrigerator.
+Answer: Beige.
+Cateogry: attribute_recognition
+Question: What is the color of the cutting board that is placed next to the knife block on the kitchen counter near the stove?
+Answer: Beige.
 Cannot find a navigable point near the object 248: ceiling lamp in distance 1.5!
 Cannot find a navigable point near the object 248: ceiling lamp in distance 2.0!
 Cannot find a navigable point near the object 248: ceiling lamp in distance 2.5!
@@ -148,23 +148,23 @@ Object id: 7, Class: flower, View: 1 saved!
 Cannot find a navigable point near the object 7: flower in distance 2.5!
 Cannot find a navigable point near the object 7: flower in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the object placed on the counter next to the toilet in the bathroom?
+Output: Question: Is the flower arrangement on the counter next to the bathtub in the bathroom upright?
 
-Answer: A flower.
-Cateogry: object_recognition
-Question: What is the object placed on the counter next to the toilet in the bathroom?
-Answer: A flower.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the flower arrangement on the counter next to the bathtub in the bathroom upright?
+Answer: Yes.
 Cannot find a navigable point near the object 16: bath in distance 1.5!
 Cannot find a navigable point near the object 16: bath in distance 2.0!
 Object id: 16, Class: bath, View: 2 saved!
 Object id: 16, Class: bath, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the object located between the sink and the toilet in the bathroom?
+Output: Question: What can I use to take a relaxing bath?
 
-Answer: A bath.
-Cateogry: object_recognition
-Question: What is the object located between the sink and the toilet in the bathroom?
-Answer: A bath.
+Answer: The bath in the bathroom.
+Cateogry: functional_reasoning
+Question: What can I use to take a relaxing bath?
+Answer: The bath in the bathroom.
 Cannot find a navigable point near the object 17: toilet paper dispenser in distance 1.5!
 Cannot find a navigable point near the object 17: toilet paper dispenser in distance 2.0!
 Cannot find a navigable point near the object 17: toilet paper dispenser in distance 2.5!
@@ -202,23 +202,23 @@ Cannot find a navigable point near the object 120: laptop in distance 2.0!
 Cannot find a navigable point near the object 120: laptop in distance 2.5!
 Cannot find a navigable point near the object 120: laptop in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the laptop that is placed on the white table near the dual monitors?
+Output: Question: What is the object on the left side of the desk, next to the keyboard and monitors in the office room?
 
-Answer: Black.
-Cateogry: attribute_recognition
-Question: What is the color of the laptop that is placed on the white table near the dual monitors?
-Answer: Black.
+Answer: A laptop.
+Cateogry: object_recognition
+Question: What is the object on the left side of the desk, next to the keyboard and monitors in the office room?
+Answer: A laptop.
 Object id: 137, Class: exercise ball, View: 0 saved!
 Object id: 137, Class: exercise ball, View: 1 saved!
 Object id: 137, Class: exercise ball, View: 2 saved!
 Cannot find a navigable point near the object 137: exercise ball in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the large blue object in the corner next to the basket and dresser?
+Output: Question: What can I use to do some core strengthening exercises?
 
-Answer: An exercise ball.
-Cateogry: object_recognition
-Question: What is the large blue object in the corner next to the basket and dresser?
-Answer: An exercise ball.
+Answer: The exercise ball in the corner of the room.
+Cateogry: functional_reasoning
+Question: What can I use to do some core strengthening exercises?
+Answer: The exercise ball in the corner of the room.
 Cannot find a navigable point near the object 154: box of tissue in distance 1.5!
 Cannot find a navigable point near the object 154: box of tissue in distance 2.0!
 Cannot find a navigable point near the object 154: box of tissue in distance 2.5!
@@ -228,23 +228,23 @@ Cannot find a navigable point near the object 175: shower bench in distance 2.0!
 Cannot find a navigable point near the object 175: shower bench in distance 2.5!
 Cannot find a navigable point near the object 175: shower bench in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the shower bench located?
+Output: Question: What is the shape of the shower bench that is located in the corner of the tiled shower?
 
-Answer: The shower bench is in the corner of the tiled shower, below the showerhead and next to the glass door.
-Cateogry: object_localization
-Question: Where is the shower bench located?
-Answer: The shower bench is in the corner of the tiled shower, below the showerhead and next to the glass door.
+Answer: It is triangular.
+Cateogry: attribute_recognition
+Question: What is the shape of the shower bench that is located in the corner of the tiled shower?
+Answer: It is triangular.
 Cannot find a navigable point near the object 232: chest in distance 1.5!
 Object id: 232, Class: chest, View: 1 saved!
 Object id: 232, Class: chest, View: 2 saved!
 Cannot find a navigable point near the object 232: chest in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the dark wooden object located at the foot of the bed in the bedroom?
+Output: Question: Is the chest at the foot of the bed in the bedroom closed?
 
-Answer: A chest.
-Cateogry: object_recognition
-Question: What is the dark wooden object located at the foot of the bed in the bedroom?
-Answer: A chest.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the chest at the foot of the bed in the bedroom closed?
+Answer: Yes.
 Cannot find a navigable point near the object 270: washing machine in distance 1.5!
 Object id: 270, Class: washing machine, View: 1 saved!
 Object id: 270, Class: washing machine, View: 2 saved!
@@ -265,12 +265,12 @@ Object id: 276, Class: clothes dryer, View: 1 saved!
 Object id: 276, Class: clothes dryer, View: 2 saved!
 Object id: 276, Class: clothes dryer, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What can I use to dry my clothes after washing them?
+Output: Question: Is the door of the clothes dryer next to the washing machine in the laundry room closed?
 
-Answer: The clothes dryer next to the washing machine.
-Cateogry: functional_reasoning
-Question: What can I use to dry my clothes after washing them?
-Answer: The clothes dryer next to the washing machine.
+Answer: No.
+Cateogry: object_state_recognition
+Question: Is the door of the clothes dryer next to the washing machine in the laundry room closed?
+Answer: No.
 Cannot find a navigable point near the object 298: fire extinguisher in distance 1.5!
 Cannot find a navigable point near the object 298: fire extinguisher in distance 2.0!
 Cannot find a navigable point near the object 298: fire extinguisher in distance 2.5!
@@ -280,34 +280,32 @@ Cannot find a navigable point near the object 299: boiler in distance 2.0!
 Object id: 299, Class: boiler, View: 2 saved!
 Object id: 299, Class: boiler, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the boiler located?
+Output: Question: What can I use to heat water for the house?
 
-Answer: The boiler is in the laundry room, next to the washing machine and dryer, near the doorway leading to the dining area.
-Cateogry: object_localization
-Question: Where is the boiler located?
-Answer: The boiler is in the laundry room, next to the washing machine and dryer, near the doorway leading to the dining area.
+Answer: The boiler in the laundry room.
+Cateogry: functional_reasoning
+Question: What can I use to heat water for the house?
+Answer: The boiler in the laundry room.
 Cannot find a navigable point near the object 319: rack in distance 1.5!
 Object id: 319, Class: rack, View: 1 saved!
 Object id: 319, Class: rack, View: 2 saved!
 Object id: 319, Class: rack, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the wooden rack with the boxes on it?
-
-Answer: The wooden rack with the boxes on it is in the garage, next to the bicycles and near the door leading to the other room.
-Cateogry: object_localization
-Question: Where is the wooden rack with the boxes on it?
-Answer: The wooden rack with the boxes on it is in the garage, next to the bicycles and near the door leading to the other room.
+Output: What can I use to store my tools and equipment in an organized manner?
+Answer: The rack in the garage.
+Invalid output for GPT: What can I use to store my tools and equipment in an organized manner?
+Answer: The rack in the garage.
 Cannot find a navigable point near the object 368: icebox in distance 1.5!
 Cannot find a navigable point near the object 368: icebox in distance 2.0!
 Object id: 368, Class: icebox, View: 2 saved!
 Object id: 368, Class: icebox, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the large white object on top of the cardboard box near the garage door?
+Output: Question: Is the lid of the white icebox on top of the cardboard box in the garage closed?
 
-Answer: An icebox.
-Cateogry: object_recognition
-Question: What is the large white object on top of the cardboard box near the garage door?
-Answer: An icebox.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the lid of the white icebox on top of the cardboard box in the garage closed?
+Answer: Yes.
 Cannot find a navigable point near the object 416: garage door in distance 1.5!
 Cannot find a navigable point near the object 416: garage door in distance 2.0!
 Cannot find a navigable point near the object 416: garage door in distance 2.5!
@@ -328,23 +326,23 @@ Object id: 433, Class: cloth, View: 1 saved!
 Object id: 433, Class: cloth, View: 2 saved!
 Cannot find a navigable point near the object 433: cloth in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the folded cloth stored in the garage?
+Output: Question: Is the cloth draped over the saddle in the garage dirty?
 
-Answer: The folded cloth is stored on top of a white bucket and a grey storage box, near the garage door and under a ladder.
-Cateogry: object_localization
-Question: Where is the folded cloth stored in the garage?
-Answer: The folded cloth is stored on top of a white bucket and a grey storage box, near the garage door and under a ladder.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the cloth draped over the saddle in the garage dirty?
+Answer: Yes.
 Cannot find a navigable point near the object 438: grill in distance 1.5!
 Cannot find a navigable point near the object 438: grill in distance 2.0!
 Object id: 438, Class: grill, View: 2 saved!
 Object id: 438, Class: grill, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Where is the grill stored in the garage?
+Output: Question: What is the covered object located to the left of the wooden chair and near the wall in the garage?
 
-Answer: The grill is stored in the garage, near the wall with various hanging items and tools, next to a wooden stool and under some blankets or covers.
-Cateogry: object_localization
-Question: Where is the grill stored in the garage?
-Answer: The grill is stored in the garage, near the wall with various hanging items and tools, next to a wooden stool and under some blankets or covers.
+Answer: A grill.
+Cateogry: object_recognition
+Question: What is the covered object located to the left of the wooden chair and near the wall in the garage?
+Answer: A grill.
 Cannot find a navigable point near the object 447: broom in distance 1.5!
 Cannot find a navigable point near the object 447: broom in distance 2.0!
 Cannot find a navigable point near the object 447: broom in distance 2.5!
@@ -366,12 +364,12 @@ Object id: 509, Class: iron board, View: 1 saved!
 Cannot find a navigable point near the object 509: iron board in distance 2.5!
 Cannot find a navigable point near the object 509: iron board in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What can I use to iron my clothes?
+Output: Question: Where is the iron board stored?
 
-Answer: The ironing board in the corner of the room.
-Cateogry: functional_reasoning
-Question: What can I use to iron my clothes?
-Answer: The ironing board in the corner of the room.
+Answer: The iron board is stored in a small room or closet, leaning against the wall with exposed wooden beams, next to a folded playpen or portable crib.
+Cateogry: object_localization
+Question: Where is the iron board stored?
+Answer: The iron board is stored in a small room or closet, leaning against the wall with exposed wooden beams, next to a folded playpen or portable crib.
 Cannot find a navigable point near the object 510: vacuum cleaner in distance 1.5!
 Cannot find a navigable point near the object 510: vacuum cleaner in distance 2.0!
 Cannot find a navigable point near the object 510: vacuum cleaner in distance 2.5!
@@ -401,12 +399,12 @@ Cannot find a navigable point near the object 606: cutting board in distance 2.0
 Cannot find a navigable point near the object 606: cutting board in distance 2.5!
 Cannot find a navigable point near the object 606: cutting board in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What can I use to chop vegetables for dinner?
+Output: Question: Is the cutting board on the kitchen counter next to the trash can clean?
 
-Answer: The cutting board on the kitchen counter.
-Cateogry: functional_reasoning
-Question: What can I use to chop vegetables for dinner?
-Answer: The cutting board on the kitchen counter.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the cutting board on the kitchen counter next to the trash can clean?
+Answer: Yes.
 Cannot find a navigable point near the object 610: soap dish in distance 1.5!
 Cannot find a navigable point near the object 610: soap dish in distance 2.0!
 Cannot find a navigable point near the object 610: soap dish in distance 2.5!
@@ -416,51 +414,52 @@ Cannot find a navigable point near the object 612: coffee machine in distance 2.
 Cannot find a navigable point near the object 612: coffee machine in distance 2.5!
 Cannot find a navigable point near the object 612: coffee machine in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What color is the coffee machine that is placed on the green marble countertop near the stove?
+Output: Question: Is the coffee machine on the kitchen counter next to the stove clean?
 
-Answer: Black.
-Cateogry: attribute_recognition
-Question: What color is the coffee machine that is placed on the green marble countertop near the stove?
-Answer: Black.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the coffee machine on the kitchen counter next to the stove clean?
+Answer: Yes.
 Object id: 614, Class: stove, View: 0 saved!
 Object id: 614, Class: stove, View: 1 saved!
 Object id: 614, Class: stove, View: 2 saved!
 Cannot find a navigable point near the object 614: stove in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the stove that is located between the dishwasher and the dining table area?
+Output: Question: What is the object located between the dishwasher and the counter in the kitchen?
 
-Answer: Stainless steel.
-Cateogry: attribute_recognition
-Question: What is the color of the stove that is located between the dishwasher and the dining table area?
-Answer: Stainless steel.
+Answer: A stove.
+Cateogry: object_recognition
+Question: What is the object located between the dishwasher and the counter in the kitchen?
+Answer: A stove.
 Object id: 619, Class: dishwasher, View: 0 saved!
 Object id: 619, Class: dishwasher, View: 1 saved!
 Object id: 619, Class: dishwasher, View: 2 saved!
 Cannot find a navigable point near the object 619: dishwasher in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What can I use to wash the dirty dishes quickly?
+Output: Question: Where is the dishwasher in the kitchen?
 
-Answer: The dishwasher under the counter.
-Cateogry: functional_reasoning
-Question: What can I use to wash the dirty dishes quickly?
-Answer: The dishwasher under the counter.
+Answer: The dishwasher is located under the counter, to the right of the sink and to the left of the oven in the kitchen.
+Cateogry: object_localization
+Question: Where is the dishwasher in the kitchen?
+Answer: The dishwasher is located under the counter, to the right of the sink and to the left of the oven in the kitchen.
 Object id: 623, Class: wine cabinet, View: 0 saved!
 Object id: 623, Class: wine cabinet, View: 1 saved!
 Object id: 623, Class: wine cabinet, View: 2 saved!
 Cannot find a navigable point near the object 623: wine cabinet in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the countertop above the wine cabinet that is located near the staircase?
+Output: Question: What is to the left of the wine cabinet in the kitchen?
 
-Answer: Green.
-Cateogry: attribute_recognition
-Question: What is the color of the countertop above the wine cabinet that is located near the staircase?
-Answer: Green.
+Answer: A trash can.
+Cateogry: spatial_understanding
+Question: What is to the left of the wine cabinet in the kitchen?
+Answer: A trash can.
 Object id: 628, Class: microwave, View: 0 saved!
 Cannot find a navigable point near the object 628: microwave in distance 2.0!
 Cannot find a navigable point near the object 628: microwave in distance 2.5!
 Cannot find a navigable point near the object 628: microwave in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
 Output: Question: Is the door of the microwave on the kitchen counter closed?
+
 Answer: Yes.
 Cateogry: object_state_recognition
 Question: Is the door of the microwave on the kitchen counter closed?
@@ -470,45 +469,44 @@ Cannot find a navigable point near the object 679: stand in distance 2.0!
 Cannot find a navigable point near the object 679: stand in distance 2.5!
 Cannot find a navigable point near the object 679: stand in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the object on the desk near the window that holds various items?
+Output: Question: What is the color of the stand that is placed on the wooden desk near the window?
 
-Answer: A stand.
-Cateogry: object_recognition
-Question: What is the object on the desk near the window that holds various items?
-Answer: A stand.
+Answer: Gold.
+Cateogry: attribute_recognition
+Question: What is the color of the stand that is placed on the wooden desk near the window?
+Answer: Gold.
 Object id: 682, Class: printer, View: 0 saved!
 Cannot find a navigable point near the object 682: printer in distance 2.0!
 Cannot find a navigable point near the object 682: printer in distance 2.5!
 Cannot find a navigable point near the object 682: printer in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is to the right of the printer on the wooden desk near the window?
+Output: Question: Where is the printer located?
 
-Answer: A black guitar case.
-Cateogry: spatial_understanding
-Question: What is to the right of the printer on the wooden desk near the window?
-Answer: A black guitar case.
+Answer: The printer is on the wooden desk near the window, next to the computer monitor and under the thermostat on the wall.
+Cateogry: object_localization
+Question: Where is the printer located?
+Answer: The printer is on the wooden desk near the window, next to the computer monitor and under the thermostat on the wall.
 Object id: 686, Class: pc tower, View: 0 saved!
 Cannot find a navigable point near the object 686: pc tower in distance 2.0!
 Cannot find a navigable point near the object 686: pc tower in distance 2.5!
 Cannot find a navigable point near the object 686: pc tower in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Is the PC tower under the wooden desk in the study room turned on?
+Output: Question: Where is the PC tower located?
 
-Answer: No.
-Cateogry: object_state_recognition
-Question: Is the PC tower under the wooden desk in the study room turned on?
-Answer: No.
+Answer: The PC tower is under the wooden desk, next to the wicker basket and near the chair in the room with a large window overlooking the garden.
+Cateogry: object_localization
+Question: Where is the PC tower located?
+Answer: The PC tower is under the wooden desk, next to the wicker basket and near the chair in the room with a large window overlooking the garden.
 Object id: 720, Class: flower vase, View: 0 saved!
 Object id: 720, Class: flower vase, View: 1 saved!
 Cannot find a navigable point near the object 720: flower vase in distance 2.5!
 Cannot find a navigable point near the object 720: flower vase in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is hanging on the wall to the left of the flower vase on the wooden dresser?
-
-Answer: A circular mirror with a decorative frame.
-Cateogry: spatial_understanding
-Question: What is hanging on the wall to the left of the flower vase on the wooden dresser?
-Answer: A circular mirror with a decorative frame.
+Output: Not proper to generate a question
+Explanation: The main function of a flower vase is to hold flowers, but this function is not unique enough for functional reasoning tasks in a household context.
+Cateogry: functional_reasoning
+Cannot generate question
+Explanation: The main function of a flower vase is to hold flowers, but this function is not unique enough for functional reasoning tasks in a household context.
 Cannot find a navigable point near the object 723: ceiling fan in distance 1.5!
 Cannot find a navigable point near the object 723: ceiling fan in distance 2.0!
 Cannot find a navigable point near the object 723: ceiling fan in distance 2.5!
@@ -522,12 +520,11 @@ Object id: 764, Class: pouffe, View: 1 saved!
 Object id: 764, Class: pouffe, View: 2 saved!
 Object id: 764, Class: pouffe, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the pouffe that is placed next to the armchair near the stone fireplace?
-
-Answer: Dark gray.
-Cateogry: attribute_recognition
-Question: What is the color of the pouffe that is placed next to the armchair near the stone fireplace?
-Answer: Dark gray.
+Output: Question: What is the small cushioned object in front of the armchair near the fireplace in the living room?
+Answer: A pouffe.
+Cateogry: object_recognition
+Question: What is the small cushioned object in front of the armchair near the fireplace in the living room?
+Answer: A pouffe.
 Cannot find a navigable point near the object 770: couch in distance 1.5!
 Cannot find a navigable point near the object 770: couch in distance 2.0!
 Cannot find a navigable point near the object 770: couch in distance 2.5!
@@ -537,12 +534,12 @@ Object id: 773, Class: coffee table, View: 1 saved!
 Object id: 773, Class: coffee table, View: 2 saved!
 Object id: 773, Class: coffee table, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: What can I use to place my coffee cup while I relax on the sofa?
+Output: Question: What is the shape of the coffee table that is placed between the gray sofa and the armchair near the bay window?
 
-Answer: The coffee table in the living room.
-Invalid output for GPT: What can I use to place my coffee cup while I relax on the sofa?
-
-Answer: The coffee table in the living room.
+Answer: Rectangular.
+Cateogry: attribute_recognition
+Question: What is the shape of the coffee table that is placed between the gray sofa and the armchair near the bay window?
+Answer: Rectangular.
 Cannot find a navigable point near the object 778: fireplace in distance 1.5!
 Cannot find a navigable point near the object 778: fireplace in distance 2.0!
 Cannot find a navigable point near the object 778: fireplace in distance 2.5!
@@ -560,23 +557,23 @@ Cannot find a navigable point near the object 795: tv in distance 2.0!
 Object id: 795, Class: tv, View: 2 saved!
 Object id: 795, Class: tv, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the TV that is placed near the staircase and below a wall painting?
+Output: Question: Is the TV in the living room turned off?
 
-Answer: Black.
-Cateogry: attribute_recognition
-Question: What is the color of the TV that is placed near the staircase and below a wall painting?
-Answer: Black.
+Answer: Yes.
+Cateogry: object_state_recognition
+Question: Is the TV in the living room turned off?
+Answer: Yes.
 Cannot find a navigable point near the object 796: tv stand in distance 1.5!
 Object id: 796, Class: tv stand, View: 1 saved!
 Cannot find a navigable point near the object 796: tv stand in distance 2.5!
 Cannot find a navigable point near the object 796: tv stand in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the color of the TV stand that is placed near the staircase and below the television?
+Output: Question: What is on the left side of the TV stand near the stairs?
 
-Answer: Black.
-Cateogry: attribute_recognition
-Question: What is the color of the TV stand that is placed near the staircase and below the television?
-Answer: Black.
+Answer: A cardboard box.
+Cateogry: spatial_understanding
+Question: What is on the left side of the TV stand near the stairs?
+Answer: A cardboard box.
 Cannot find a navigable point near the object 843: plant ornament in distance 1.5!
 Cannot find a navigable point near the object 843: plant ornament in distance 2.0!
 Cannot find a navigable point near the object 843: plant ornament in distance 2.5!
@@ -586,15 +583,15 @@ Cannot find a navigable point near the object 853: mixer in distance 2.0!
 Cannot find a navigable point near the object 853: mixer in distance 2.5!
 Cannot find a navigable point near the object 853: mixer in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is the silver object on the wooden cabinet near the wall with the horse picture?
+Output: Question: What is hanging on the wall above the mixer on the wooden cabinet?
 
-Answer: A mixer.
-Cateogry: object_recognition
-Question: What is the silver object on the wooden cabinet near the wall with the horse picture?
-Answer: A mixer.
+Answer: A sign that says "Friends and Family gather here."
+Cateogry: spatial_understanding
+Question: What is hanging on the wall above the mixer on the wooden cabinet?
+Answer: A sign that says "Friends and Family gather here."
 Scene loaded: DNWbUAJYsPy
 Rare classes: ['couch', 'window frame', 'unknown', 'wall toilet paper', 'alarm clock', 'sofa seat', 'bed', 'telephone', 'wardrobe', 'laundry basket', 'shower floor', 'bathtub', 'bath faucet', 'soapbox', 'shower door', 'shower door frame', 'handbag', 'dumbbell', 'showerhead']
-Loaded 37 previously generated questions
+Loaded 36 previously generated questions
 Cannot find a navigable point near the object 36: couch in distance 1.5!
 Cannot find a navigable point near the object 36: couch in distance 2.0!
 Cannot find a navigable point near the object 36: couch in distance 2.5!
@@ -608,11 +605,12 @@ Object id: 183, Class: sofa seat, View: 1 saved!
 Object id: 183, Class: sofa seat, View: 2 saved!
 Object id: 183, Class: sofa seat, View: 3 saved!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Is the lamp next to the blue sofa seat in the bedroom turned on?
-Answer: Yes.
-Cateogry: object_state_recognition
-Question: Is the lamp next to the blue sofa seat in the bedroom turned on?
-Answer: Yes.
+Output: Question: What is the object to the right of the bed and next to the lamp in the bedroom?
+
+Answer: A sofa seat.
+Cateogry: object_recognition
+Question: What is the object to the right of the bed and next to the lamp in the bedroom?
+Answer: A sofa seat.
 Cannot find a navigable point near the object 184: bed in distance 1.5!
 Cannot find a navigable point near the object 184: bed in distance 2.0!
 Cannot find a navigable point near the object 184: bed in distance 2.5!
@@ -622,12 +620,11 @@ Cannot find a navigable point near the object 190: telephone in distance 2.0!
 Cannot find a navigable point near the object 190: telephone in distance 2.5!
 Cannot find a navigable point near the object 190: telephone in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: Is the telephone on the bedside table next to the bed in the bedroom properly placed?
-
-Answer: Yes.
-Cateogry: object_state_recognition
-Question: Is the telephone on the bedside table next to the bed in the bedroom properly placed?
-Answer: Yes.
+Output: Question: What can I use to make a phone call from the bedroom?
+Answer: The telephone on the bedside table.
+Cateogry: functional_reasoning
+Question: What can I use to make a phone call from the bedroom?
+Answer: The telephone on the bedside table.
 Cannot find a navigable point near the object 221: wardrobe in distance 1.5!
 Cannot find a navigable point near the object 221: wardrobe in distance 2.0!
 Cannot find a navigable point near the object 221: wardrobe in distance 2.5!
@@ -637,12 +634,12 @@ Object id: 245, Class: laundry basket, View: 1 saved!
 Cannot find a navigable point near the object 245: laundry basket in distance 2.5!
 Cannot find a navigable point near the object 245: laundry basket in distance 3.0!
 HTTP Request: POST https://yuncong.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview "HTTP/1.1 200 OK"
-Output: Question: What is next to the laundry basket near the doorway in the bedroom?
+Output: Question: Is the laundry basket next to the TV stand in the bedroom empty?
 
-Answer: A black cabinet with a television on top.
-Cateogry: spatial_understanding
-Question: What is next to the laundry basket near the doorway in the bedroom?
-Answer: A black cabinet with a television on top.
+Answer: No.
+Cateogry: object_state_recognition
+Question: Is the laundry basket next to the TV stand in the bedroom empty?
+Answer: No.
 Cannot find a navigable point near the object 291: bathtub in distance 1.5!
 Cannot find a navigable point near the object 291: bathtub in distance 2.0!
 Cannot find a navigable point near the object 291: bathtub in distance 2.5!

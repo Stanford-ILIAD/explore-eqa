@@ -1,8 +1,3 @@
-"""
-Run EQA in Habitat-Sim with VLM exploration.
-
-"""
-
 import os
 import random
 
@@ -33,7 +28,8 @@ from src.habitat import (
     pos_habitat_to_normal,
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
-    get_quaternion
+    get_quaternion,
+    get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds
 from src.vlm import VLM
@@ -47,84 +43,33 @@ def main(cfg):
     img_width = cfg.img_width
     cam_intr = get_cam_intr(cfg.hfov, img_height, img_width)
 
-    cfg.seed = np.random.randint(1000000)
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
 
     # Load dataset
-    with open(cfg.question_data_path) as f:
-        questions_data = [
-            {k: v for k, v in row.items()}
-            for row in csv.DictReader(f, skipinitialspace=True)
-        ]
-    with open(cfg.init_pose_data_path) as f:
-        init_pose_data = {}
-        for row in csv.DictReader(f, skipinitialspace=True):
-            init_pose_data[row["scene_floor"]] = {
-                "init_pts": [
-                    float(row["init_x"]),
-                    float(row["init_y"]),
-                    float(row["init_z"]),
-                ],
-                "init_angle": float(row["init_angle"]),
-            }
-    logging.info(f"Loaded {len(questions_data)} questions.")
+    with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
+        questions_data = json.load(f)
+    all_scene_list = list(set([q["episode_history"] for q in questions_data]))
 
-    # Load VLM
-    # vlm = VLM(cfg.vlm)
-    vlm = None
+    # for each scene, answer each question
+    for scene_id in all_scene_list:
+        all_questions_in_scene = [q for q in questions_data if q["episode_history"] == scene_id]
 
-    # Run all questions
-    cnt_data = 0
-    results_all = []
-    # questions_data = questions_data[10:]
-    for question_ind in tqdm(range(len(questions_data))):
+        # load scene
+        split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
+        scene_mesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.glb")
+        navmesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
+        semantic_texture_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.glb")
+        scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
+        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
 
-        # Extract question
-        question_data = questions_data[question_ind]
-        scene = question_data["scene"]
-        floor = question_data["floor"]
-        scene_floor = scene + "_" + floor
-        question = question_data["question"]
-        choices = question_data["choices"]
-        answer = question_data["answer"]
-        init_pts = init_pose_data[scene_floor]["init_pts"]
-        init_angle = init_pose_data[scene_floor]["init_angle"]
-        logging.info(f"\n========\nIndex: {question_ind} Scene: {scene} Floor: {floor}")
-        logging.info(f"Question: {question} Choices: {choices}, Answer: {answer}")
-
-        ######
-        # load semantic object bbox data
-        with open(os.path.join(cfg.semantic_bbox_data_path, f"{scene}.json")) as f:
-            semantic_data = json.load(f)
-        ######
-
-        # Re-format the question to follow LLaMA style
-        # vlm_question = question
-        # vlm_pred_candidates = ["A", "B", "C", "D"]
-        # for token, choice in zip(vlm_pred_candidates, choices):
-        #     vlm_question += "\n" + token + "." + " " + choice
-
-        # Set data dir for this question - set initial data to be saved
-        episode_data_dir = os.path.join(str(cfg.output_dir), str(question_ind))
-        episode_frontier_dir = os.path.join(str(cfg.frontier_dir), str(question_ind))
-        os.makedirs(episode_data_dir, exist_ok=True)
-        os.makedirs(episode_frontier_dir, exist_ok=True)
-        result = {"question_ind": question_ind}
-
-        # Set up scene in Habitat
         try:
             simulator.close()
         except:
             pass
-        scene_mesh_dir = os.path.join(
-            cfg.scene_data_path, scene, scene[6:] + ".basis" + ".glb"
-        )
-        navmesh_file = os.path.join(
-            cfg.scene_data_path, scene, scene[6:] + ".basis" + ".navmesh"
-        )
+
         sim_settings = {
-            "scene": scene_mesh_dir,
+            "scene": scene_mesh_path,
             "default_agent": 0,
             "sensor_height": cfg.camera_height,
             "width": img_width,
@@ -136,235 +81,215 @@ def main(cfg):
         simulator = habitat_sim.Simulator(sim_cfg)
         pathfinder = simulator.pathfinder
         pathfinder.seed(cfg.seed)
-        pathfinder.load_nav_mesh(navmesh_file)
+        pathfinder.load_nav_mesh(navmesh_path)
         agent = simulator.initialize_agent(sim_settings["default_agent"])
         agent_state = habitat_sim.AgentState()
-        pts = init_pts
-        angle = init_angle
+        logging.info(f"Load scene {scene_id} successfully")
 
-        # Floor - use pts height as floor height
-        rotation = get_quaternion(angle, camera_tilt)
-        pts_normal = pos_habitat_to_normal(pts)
-        floor_height = pts_normal[-1]
-        tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
-        num_step = int(math.sqrt(scene_size) * cfg.max_step_room_size_ratio)
-        logging.info(
-            f"Scene size: {scene_size} Floor height: {floor_height} Steps: {num_step}"
-        )
+        # load semantic object bbox data
+        bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
+        object_id_to_bbox = {int(item['id']): item['bbox'] for item in bounding_box_data}
+        #
+        # # Load the semantic annotation
+        # obj_id_to_class = {}
+        # obj_id_to_room_id = {}
+        # with open(scene_semantic_annotation_path, "r") as f:
+        #     for line in f.readlines():
+        #         if 'HM3D Semantic Annotations' in line:  # skip the first line
+        #             continue
+        #         line = line.strip().split(',')
+        #         idx = int(line[0])
+        #         class_name = line[2].replace("\"", "")
+        #         room_id = int(line[3])
+        #         obj_id_to_class[idx] = class_name
+        #         obj_id_to_room_id[idx] = room_id
+        # obj_id_to_class[0] = 'unannotated'
 
-        # Initialize TSDF
-        tsdf_planner = TSDFPlanner(
-            vol_bnds=tsdf_bnds,
-            voxel_size=cfg.tsdf_grid_size,
-            floor_height_offset=0,
-            pts_init=pos_habitat_to_normal(pts),
-            init_clearance=cfg.init_clearance * 2,
-        )
+        for question_data in all_questions_in_scene:
+            target_obj_id = question_data['object_id']
+            target_position = question_data['position']
+            target_rotation = question_data['rotation']
+            episode_data_dir = os.path.join(str(cfg.output_dir), str(question_data["question_id"]))
+            episode_frontier_dir = os.path.join(str(cfg.frontier_dir), str(question_data["question_id"]))
+            os.makedirs(episode_data_dir, exist_ok=True)
+            os.makedirs(episode_frontier_dir, exist_ok=True)
 
-        # find an endpoint for the path
-        pts_end = None
-        path_points = None
-        max_try = 1000
-        try_count = 0
-        max_distance_history = -1
-        # try to find a path that is long enough
-        while True:
-            try_count += 1
-            if try_count > max_try:
-                break
-
-            pts_end_current = simulator.pathfinder.get_random_navigable_point()
-            if np.abs(pts_end_current[1] - pts[1]) > 0.4:  # make sure the end point is on the same level
+            # get a navigation start point
+            start_position, path_points = get_navigable_point_to(
+                target_position, pathfinder, max_search=1000, min_dist=6
+            )
+            if start_position is None or path_points is None:
+                logging.info(f"Cannot find a navigable path to the target object in question {question_data['question_id']}")
                 continue
 
-            path = habitat_sim.ShortestPath()
-            path.requested_start = pts
-            path.requested_end = pts_end_current
-            found_path = simulator.pathfinder.find_path(path)
-            if found_path:
-                if path.geodesic_distance > max_distance_history:
-                    max_distance_history = path.geodesic_distance
-                    pts_end = pts_end_current
-                    path_points = path.points
+            # set the initial orientation of the agent as random
+            angle = np.random.uniform(0, 2 * np.pi)
+            pts = start_position.copy()
 
-            if found_path and max_distance_history > 6:
-                break
+            # initialize the TSDF
+            pts_normal = pos_habitat_to_normal(pts)
+            floor_height = target_position[1]
+            tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
+            num_step = int(math.sqrt(scene_size) * cfg.max_step_room_size_ratio)
+            try:
+                del tsdf_planner
+            except:
+                pass
+            tsdf_planner = TSDFPlanner(
+                vol_bnds=tsdf_bnds,
+                voxel_size=cfg.tsdf_grid_size,
+                floor_height_offset=0,
+                pts_init=pos_habitat_to_normal(start_position),
+                init_clearance=cfg.init_clearance * 2,
+            )
 
-        assert pts_end is not None and path_points is not None
-        assert np.array_equal(path_points[0], np.asarray(pts, dtype=np.float32)) and np.array_equal(path_points[-1], pts_end)
-        init_orientation = path_points[1] - path_points[0]
-        init_orientation[1] = 0
-        # set the agent's orientation
-        rotation = quat_to_coeffs(
-            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
-            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-        ).tolist()
-        angle, axis = quat_to_angle_axis(  # overwrite the original angle with the new one that points along the path
-            quat_from_two_vectors(np.array([0, 0, -1]), init_orientation)
-        )
-        angle = angle if axis[1] > 0 else -angle
-        # convert path points to normal
-        path_points = [pos_habitat_to_normal(p) for p in path_points]
-        # drop y coordinate
-        path_points = [p[:2] for p in path_points]
+            # convert path points to normal and drop y-axis for tsdf planner
+            path_points = [pos_habitat_to_normal(p) for p in path_points]
+            path_points = [p[:2] for p in path_points]
 
-        pts_pixs = np.empty((0, 2))  # for plotting path on the image
-        # get the voxel coordinate of the init position
-        pts_voxel = pos_habitat_to_normal(pts)
-        pts_voxel = (pts_voxel[:2] - tsdf_planner._vol_origin[:2]) / tsdf_planner._voxel_size
-        pts_pixs = np.vstack((pts_pixs, pts_voxel))
+            # record the history of the agent's path
+            pts_pixs = np.empty((0, 2))
+            pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(start_position)[:2]))
 
-        # Run steps
-        for cnt_step in range(num_step):
-            logging.info(f"\n== step: {cnt_step}")
+            logging.info(f'Question id {question_data["question_id"]} finish initialization')
 
-            angle_increment = cfg.extra_view_angle_deg * np.pi / 180
-            all_angles = [angle + angle_increment * i for i in range(-cfg.extra_view // 2, cfg.extra_view // 2 + 1)]
-            # let the main viewing angle be the last one to avoid potential overwriting problems
-            main_angle = all_angles.pop(cfg.extra_view // 2)
-            all_angles.append(main_angle)
+            # run steps
+            for cnt_step in range(num_step):
+                logging.info(f"\n== step: {cnt_step}")
 
-            for view_idx, ang in enumerate(all_angles):
+                # for each position, get the views from different angles
+                angle_increment = cfg.extra_view_angle_deg * np.pi / 180
+                total_views = 1 + cfg.extra_view
+                all_angles = [angle + angle_increment * (i - total_views // 2) for i in range(total_views)]
+                # let the main viewing angle be the last one to avoid potential overwriting problems
+                main_angle = all_angles.pop(total_views // 2)
+                all_angles.append(main_angle)
 
-                # Save step info and set current pose
-                step_name = f"step_{cnt_step}"
-                logging.info(f"Current pts: {pts}")
-                agent_state.position = pts
-                agent_state.rotation = get_quaternion(ang, camera_tilt)
-                agent.set_state(agent_state)
-                pts_normal = pos_habitat_to_normal(pts)
-                result[step_name] = {"pts": pts, "angle": angle}
+                # observe and update the TSDF
+                for view_idx, ang in enumerate(all_angles):
+                    logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
 
-                # Update camera info
-                sensor = agent.get_state().sensor_states["depth_sensor"]
-                quaternion_0 = sensor.rotation
-                translation_0 = sensor.position
-                cam_pose = np.eye(4)
-                cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
-                cam_pose[:3, 3] = translation_0
-                cam_pose_normal = pose_habitat_to_normal(cam_pose)
-                cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
+                    agent_state.position = pts
+                    agent_state.rotation = get_quaternion(ang, camera_tilt)
+                    agent.set_state(agent_state)
+                    pts_normal = pos_habitat_to_normal(pts)
 
-                # Get observation at current pose - skip black image, meaning robot is outside the floor
-                obs = simulator.get_sensor_observations()
-                rgb = obs["color_sensor"]
-                depth = obs["depth_sensor"]
-                semantic_obs = obs["semantic_sensor"]
+                    # Update camera info
+                    sensor = agent.get_state().sensor_states["depth_sensor"]
+                    quaternion_0 = sensor.rotation
+                    translation_0 = sensor.position
+                    cam_pose = np.eye(4)
+                    cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
+                    cam_pose[:3, 3] = translation_0
+                    cam_pose_normal = pose_habitat_to_normal(cam_pose)
+                    cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
 
-                # construct an frequency count map of each semantic id to a unique id
-                masked_ids = np.unique(semantic_obs[depth > 3.0])
-                semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
-                tsdf_planner.increment_scene_graph(semantic_obs, semantic_data)
-                if cfg.save_obs:
-                    plt.imsave(
-                        os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb
-                    )
-                    semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
-                    semantic_img.putpalette(d3_40_colors_rgb.flatten())
-                    semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
-                    semantic_img = semantic_img.convert("RGBA")
-                    semantic_img.save(
-                        os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png")
-                    )
+                    # Get observation at current pose - skip black image, meaning robot is outside the floor
+                    obs = simulator.get_sensor_observations()
+                    rgb = obs["color_sensor"]
+                    depth = obs["depth_sensor"]
+                    semantic_obs = obs["semantic_sensor"]
 
-                num_black_pixels = np.sum(
-                    np.sum(rgb, axis=-1) == 0
-                )  # sum over channel first
-                if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
-
-                    # TSDF fusion
-                    tsdf_planner.integrate(
-                        color_im=rgb,
-                        depth_im=depth,
-                        cam_intr=cam_intr,
-                        cam_pose=cam_pose_tsdf,
-                        obs_weight=1.0,
-                        margin_h=int(cfg.margin_h_ratio * img_height),
-                        margin_w=int(cfg.margin_w_ratio * img_width),
-                    )
-
-                    # Get VLM prediction
-                    rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
-
-                    # Get frontier candidates
-                    prompt_points_pix = []
-                    if cfg.use_active:
-                        prompt_points_pix, fig = (
-                            tsdf_planner.find_prompt_points_within_view(
-                                pts_normal,
-                                img_width,
-                                img_height,
-                                cam_intr,
-                                cam_pose_tsdf,
-                                **cfg.visual_prompt,
-                            )
+                    # construct an frequency count map of each semantic id to a unique id
+                    masked_ids = np.unique(semantic_obs[depth > 3.0])
+                    semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
+                    tsdf_planner.increment_scene_graph(semantic_obs, bounding_box_data)
+                    if cfg.save_obs:
+                        plt.imsave(
+                            os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb
                         )
-                        fig.tight_layout()
-                        plt.savefig(
-                            os.path.join(
-                                episode_data_dir, "{}_prompt_points.png".format(cnt_step)
-                            )
-                        )
-                        plt.close()
-
-                    # Visual prompting
-                    draw_letters = ["1", "2", "3", "4"]  # always four
-                    fnt = ImageFont.truetype(
-                        "data/Open_Sans/static/OpenSans-Regular.ttf",
-                        30,
-                    )
-                    actual_num_prompt_points = len(prompt_points_pix)
-                    # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
-                    if True:
-                        rgb_im_draw = rgb_im.copy()
-                        draw = ImageDraw.Draw(rgb_im_draw)
-                        for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                            draw.text(
-                                tuple(point_pix.astype(int).tolist()),
-                                draw_letters[prompt_point_ind],
-                                font=fnt,
-                                fill=(255, 0, 0, 255),
-                                anchor="mm",
-                                font_size=15,
-                            )
-
-                        rgb_im_draw.save(
-                            os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
+                        semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
+                        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+                        semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
+                        semantic_img = semantic_img.convert("RGBA")
+                        semantic_img.save(
+                            os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png")
                         )
 
-                        for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                            # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
-                            width = 640
-                            height = 480
-                            size = 100
-                            rgb_im_draw_cropped = rgb_im.crop(
-                                (
-                                    max(point_pix[0] - size, 0),
-                                    max(point_pix[1] - size, 0),
-                                    min(point_pix[0] + size, width),
-                                    min(point_pix[1] + size, height),
+                    num_black_pixels = np.sum(np.sum(rgb, axis=-1) == 0)  # sum over channel first
+                    if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
+                        # TSDF fusion
+                        tsdf_planner.integrate(
+                            color_im=rgb,
+                            depth_im=depth,
+                            cam_intr=cam_intr,
+                            cam_pose=cam_pose_tsdf,
+                            obs_weight=1.0,
+                            margin_h=int(cfg.margin_h_ratio * img_height),
+                            margin_w=int(cfg.margin_w_ratio * img_width),
+                        )
+
+                        # Get VLM prediction
+                        rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
+
+                        # Get frontier candidates
+                        prompt_points_pix = []
+                        if cfg.use_active:
+                            prompt_points_pix, fig = (
+                                tsdf_planner.find_prompt_points_within_view(
+                                    pts_normal,
+                                    img_width,
+                                    img_height,
+                                    cam_intr,
+                                    cam_pose_tsdf,
+                                    **cfg.visual_prompt,
                                 )
                             )
-                            rgb_im_draw_cropped.save(
+                            fig.tight_layout()
+                            plt.savefig(
                                 os.path.join(
-                                    episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
+                                    episode_data_dir, "{}_prompt_points.png".format(cnt_step)
                                 )
                             )
+                            plt.close()
 
-                        logging.info(f"Figure saved")
+                        # Visual prompting
+                        draw_letters = ["1", "2", "3", "4"]  # always four
+                        fnt = ImageFont.truetype(
+                            "data/Open_Sans/static/OpenSans-Regular.ttf",
+                            30,
+                        )
+                        actual_num_prompt_points = len(prompt_points_pix)
+                        # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
+                        if True:
+                            rgb_im_draw = rgb_im.copy()
+                            draw = ImageDraw.Draw(rgb_im_draw)
+                            for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                                draw.text(
+                                    tuple(point_pix.astype(int).tolist()),
+                                    draw_letters[prompt_point_ind],
+                                    font=fnt,
+                                    fill=(255, 0, 0, 255),
+                                    anchor="mm",
+                                    font_size=15,
+                                )
 
-                    # Save data
-                    # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
-                    # result[step_name]["smx_vlm_rel"] = smx_vlm_rel
-                    result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                    result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
-                else:
-                    logging.info("Skipping black image!")
-                    result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                    result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+                            rgb_im_draw.save(
+                                os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
+                            )
 
-            # Determine next point
-            if cnt_step < num_step:
+                            for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
+                                # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
+                                width = 640
+                                height = 480
+                                size = 100
+                                rgb_im_draw_cropped = rgb_im.crop(
+                                    (
+                                        max(point_pix[0] - size, 0),
+                                        max(point_pix[1] - size, 0),
+                                        min(point_pix[0] + size, width),
+                                        min(point_pix[1] + size, height),
+                                    )
+                                )
+                                rgb_im_draw_cropped.save(
+                                    os.path.join(
+                                        episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
+                                    )
+                                )
+
+                            logging.info(f"Figure saved")
+
+                # determine the next point and move the agent
                 pts_normal, angle, pts_pix, fig, path_points = tsdf_planner.find_next_pose_with_path(
                     pts=pts_normal,
                     angle=angle,
@@ -402,10 +327,8 @@ def main(cfg):
                         )
                         frontier.image = f"{cnt_step}_frontier_{i}.png"
 
+                # update the agent's position record
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
-                pts_normal = np.append(pts_normal, floor_height)
-                pts = pos_normal_to_habitat(pts_normal)
-
                 # Add path to ax5, with colormap to indicate order
                 ax5 = fig.axes[4]
                 ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
@@ -415,56 +338,24 @@ def main(cfg):
                     os.path.join(episode_data_dir, "{}_map.png".format(cnt_step))
                 )
                 plt.close()
-            rotation = quat_to_coeffs(
-                quat_from_angle_axis(angle, np.array([0, 1, 0]))
-                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-            ).tolist()
 
-        # Check if success using weighted prediction
-        smx_vlm_all = np.empty((0, 4))
-        relevancy_all = []
-        candidates = ["A", "B", "C", "D"]
-        for step in range(num_step):
-            smx_vlm_pred = result[f"step_{step}"]["smx_vlm_pred"]
-            smx_vlm_rel = result[f"step_{step}"]["smx_vlm_rel"]
-            relevancy_all.append(smx_vlm_rel[0])
-            smx_vlm_all = np.vstack((smx_vlm_all, smx_vlm_rel[0] * smx_vlm_pred))
-        # Option 1: use the max of the weighted predictions
-        smx_vlm_max = np.max(smx_vlm_all, axis=0)
-        pred_token = candidates[np.argmax(smx_vlm_max)]
-        success_weighted = pred_token == answer
-        # Option 2: use the max of the relevancy
-        max_relevancy = np.argmax(relevancy_all)
-        relevancy_ord = np.flip(np.argsort(relevancy_all))
-        pred_token = candidates[np.argmax(smx_vlm_all[max_relevancy])]
-        success_max = pred_token == answer
+                # update position and rotation
+                pts_normal = np.append(pts_normal, floor_height)
+                pts = pos_normal_to_habitat(pts_normal)
+                rotation = quat_to_coeffs(
+                    quat_from_angle_axis(angle, np.array([0, 1, 0]))
+                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                ).tolist()
 
-        # Episode summary
-        logging.info(f"\n== Episode Summary")
-        logging.info(f"Scene: {scene}, Floor: {floor}")
-        logging.info(f"Question: {question}, Choices: {choices}, Answer: {answer}")
-        logging.info(f"Success (weighted): {success_weighted}")
-        logging.info(f"Success (max): {success_max}")
-        logging.info(
-            f"Top 3 steps with highest relevancy with value: {relevancy_ord[:3]} {[relevancy_all[i] for i in relevancy_ord[:3]]}"
-        )
-        for rel_ind in range(3):
-            logging.info(f"Prediction: {smx_vlm_all[relevancy_ord[rel_ind]]}")
+            logging.info(f'Question id {question_data["question_id"]} finish')
 
-        # Save data
-        results_all.append(result)
-        cnt_data += 1
-        if cnt_data % cfg.save_freq == 0:
-            with open(
-                os.path.join(cfg.output_dir, f"results_{cnt_data}.pkl"), "wb"
-            ) as f:
-                pickle.dump(results_all, f)
+        logging.info(f'Scene {scene_id} finish')
 
-    # Save all data again
-    with open(os.path.join(cfg.output_dir, "results.pkl"), "wb") as f:
-        pickle.dump(results_all, f)
-    logging.info(f"\n== All Summary")
-    logging.info(f"Number of data collected: {cnt_data}")
+    logging.info(f'All scenes finish')
+    try:
+        simulator.close()
+    except:
+        pass
 
 
 if __name__ == "__main__":

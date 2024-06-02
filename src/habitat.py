@@ -221,3 +221,65 @@ def get_quaternion(angle, camera_tilt):
         quat_from_angle_axis(angle, np.array([0, 1, 0])) *
         quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
     ).tolist()
+
+
+def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6):
+    pos_end = None
+    path_points = None
+    try_count = 0
+    max_distance_history = -1
+    # try to find a path that is long enough
+    while True:
+        try_count += 1
+        if try_count > max_search:
+            break
+
+        pos_end_current = pathfinder.get_random_navigable_point()
+        if np.abs(pos_end_current[1] - pos_start[1]) > 0.4:  # make sure the end point is on the same level
+            continue
+
+        path = habitat_sim.ShortestPath()
+        path.requested_start = pos_start
+        path.requested_end = pos_end_current
+        found_path = pathfinder.find_path(path)
+        if found_path:
+            if path.geodesic_distance > max_distance_history:
+                max_distance_history = path.geodesic_distance
+                pos_end = pos_end_current
+                path_points = path.points
+
+        if found_path and max_distance_history > min_dist:
+            break
+
+    if pos_end is not None and path_points is not None:
+        assert np.array_equal(path_points[0], np.asarray(pos_start, dtype=np.float32)) and np.array_equal(path_points[-1], pos_end)
+
+    return pos_end, path_points
+
+
+def get_navigable_point_to(pos_end, pathfinder, max_search=1000, min_dist=6):
+    pos_start, path_point = get_navigable_point_from(pos_end, pathfinder, max_search, min_dist)
+    if pos_start is None or path_point is None:
+        return None, None
+
+    # reverse the path_point
+    path_point = path_point[::-1]
+    return pos_start, path_point
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

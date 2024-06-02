@@ -1212,6 +1212,11 @@ class TSDFPlanner:
         else:
             return np.linalg.norm(p1 - p2), None
 
+    def habitat2voxel(self, pts):
+        pts_normal = pos_habitat_to_normal(pts)
+        pts_voxel = self.world2vox(pts_normal)
+        return pts_voxel
+
 
 
 

@@ -2,19 +2,10 @@
 seed: 42
 exp_name: vlm_exp_frontiers
 output_parent_dir: results
-question_data_path: data/questions.csv
-init_pose_data_path: data/scene_init_poses.csv
-scene_dataset_config_path: data/hm3d_annotated_basis.scene_dataset_config.json
-scene_data_path: data/train
-semantic_bbox_data_path: data/
-save_obs: true
-save_freq: 10
-
-# Question answering
-vlm:
-  hf_token:
-  device: cuda
-  model_id: prism-dinosiglip+7b
+question_data_path: "generated_questions"
+scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
+scene_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d"
+semantic_bbox_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged"
 
 # Camera, image
 camera_height: 1.5
@@ -25,6 +16,8 @@ hfov: 120
 tsdf_grid_size: 0.1
 margin_w_ratio: 0.25
 margin_h_ratio: 0.6
+
+save_obs: true
 
 # Navigation
 init_clearance: 0.5
