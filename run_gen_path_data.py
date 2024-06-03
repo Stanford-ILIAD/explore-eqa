@@ -40,6 +40,9 @@ from habitat_sim.utils.common import d3_40_colors_rgb
 tricky case list:
 00606-W16Bm4ysK8v_276_clothes_dryer_572722 there's stairs in the floor, so the tsdfplanner cannot work currently
 00324-DoSbsoo4EAg_240_cutting_board_878397 when walking along the wall, the left/right camera cannot capture valid images (maybe due to habitat)
+
+00657-TSJmdttd2GV_505_newspaper_733906
+00657-TSJmdttd2GV_424_chess_3677
 '''
 
 
@@ -64,7 +67,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
+        all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00366-fxbzYAGkrtm_195_ventilation_hood_574025']
         # all_questions_in_scene = all_questions_in_scene[6:]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
@@ -129,7 +132,7 @@ def main(cfg):
             os.makedirs(episode_frontier_dir, exist_ok=True)
 
             # get a navigation start point
-            start_position, path_points = get_navigable_point_to(
+            start_position, path_points, travel_dist = get_navigable_point_to(
                 target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist
             )
             if start_position is None or path_points is None:
@@ -137,14 +140,18 @@ def main(cfg):
                 continue
 
             # set the initial orientation of the agent as random
-            angle = np.random.uniform(0, 2 * np.pi)
+            # angle = np.random.uniform(0, 2 * np.pi)
+            init_orientation = path_points[1] - path_points[0]
+            init_orientation[1] = 0
+            init_rotation_quat = quat_from_two_vectors(np.asarray([0, 0, -1]), init_orientation)
+            angle, axis = quat_to_angle_axis(init_rotation_quat)
+            angle = angle * axis[1] / np.abs(axis[1])
             pts = start_position.copy()
 
             # initialize the TSDF
             pts_normal = pos_habitat_to_normal(pts)
             floor_height = target_position[1]
             tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
-            num_step = int(math.sqrt(scene_size) * cfg.max_step_room_size_ratio)
             try:
                 del tsdf_planner
             except:
@@ -169,6 +176,7 @@ def main(cfg):
 
             # run steps
             target_found = False
+            num_step = int(travel_dist * cfg.max_step_dist_ratio)
             for cnt_step in range(num_step):
                 logging.info(f"\n== step: {cnt_step}")
 

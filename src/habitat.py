@@ -254,17 +254,17 @@ def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6)
     if pos_end is not None and path_points is not None:
         assert np.array_equal(path_points[0], np.asarray(pos_start, dtype=np.float32)) and np.array_equal(path_points[-1], pos_end)
 
-    return pos_end, path_points
+    return pos_end, path_points, max_distance_history
 
 
 def get_navigable_point_to(pos_end, pathfinder, max_search=1000, min_dist=6):
-    pos_start, path_point = get_navigable_point_from(pos_end, pathfinder, max_search, min_dist)
+    pos_start, path_point, travel_dist = get_navigable_point_from(pos_end, pathfinder, max_search, min_dist)
     if pos_start is None or path_point is None:
         return None, None
 
     # reverse the path_point
     path_point = path_point[::-1]
-    return pos_start, path_point
+    return pos_start, path_point, travel_dist
 
 
 

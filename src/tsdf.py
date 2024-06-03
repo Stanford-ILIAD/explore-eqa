@@ -67,7 +67,8 @@ class Frontier:
             raise TypeError("Cannot compare Frontier with non-Frontier object.")
         # two frontiers are equal if they have the same position, and their orientations are close
         return (np.array_equal(self.position, other.position) and
-                np.dot(self.orientation, other.orientation) / (np.linalg.norm(self.orientation) * np.linalg.norm(other.orientation)) > 0.9)
+                np.dot(self.orientation, other.orientation) / (np.linalg.norm(self.orientation) * np.linalg.norm(other.orientation)) > 0.9 and
+                np.abs(self.area - other.area) < 5)
 
 
 @dataclass
@@ -75,6 +76,7 @@ class Object:
     """Object class for semantic objects."""
 
     position: np.ndarray  # integer position in voxel grid
+    object_id: int
 
 
 class TSDFPlanner:
@@ -607,6 +609,7 @@ class TSDFPlanner:
         pathfinder,
         target_obj_id,
         flag_no_val_weight=False,
+        save_visualization=True,
         unexplored_T=0.5,
         unoccupied_T=3,
         val_T=0.5,
@@ -625,6 +628,7 @@ class TSDFPlanner:
         eps=0.5,
         min_frontier_area=6,
         final_observe_distance=1.0,
+        return_choice=False,
         **kwargs,
     ):
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
@@ -662,6 +666,11 @@ class TSDFPlanner:
             & (unexplored_neighbors <= frontier_max_neighbors)
         )
         frontiers_pre_cluster = frontiers_regions.copy()
+
+        if len(frontiers_regions) == 0:
+            # this happens when there are stairs on the floor, and the planner cannot handle this situation
+            # just skip this question
+            return (None,)
 
         # cluster frontier regions
         db = DBSCAN(eps=eps, min_samples=2).fit(frontiers_regions)
@@ -723,9 +732,9 @@ class TSDFPlanner:
             target_navigable_point = get_proper_observe_point(target_point, unoccupied, dist=final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
-                raise ValueError("No unoccupied point is found in the scene")
+                return (None,)
             self.target_point = target_navigable_point
-            self.max_point = Object(target_point.astype(int))
+            self.max_point = Object(target_point.astype(int), target_obj_id)
             logging.info(f"Target point found: {target_point}")
 
         # if target point is not found, find the next frontier
@@ -897,7 +906,7 @@ class TSDFPlanner:
             if point_type == "current":
                 logging.info("No patches, return current point and random direction")
                 next_point = cur_point[:2]
-                max_point = Object(next_point.astype(int))
+                max_point = Object(next_point.astype(int), -1)
         else:  # target point is found, then go directly to the target point
             point_type = "commit"
             next_point = self.target_point.copy()
@@ -957,81 +966,83 @@ class TSDFPlanner:
             max_point.visited = True
 
         # Plot
-        fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
-        agent_orientation = self.rad2vector(angle)
-        ax1.imshow(unoccupied)
-        ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
-        ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
-        ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
-        # plot all the detected objects
-        for obj_center in self.simple_scene_graph.values():
-            obj_vox = self.habitat2voxel(obj_center)
-            ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
-        # plot the target point if found
-        if self.target_point is not None:
-            ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
-        ax1.set_title("Unoccupied")
+        fig = None
+        if save_visualization:
+            fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
+            agent_orientation = self.rad2vector(angle)
+            ax1.imshow(unoccupied)
+            ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
+            ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
+            ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+            # plot all the detected objects
+            for obj_center in self.simple_scene_graph.values():
+                obj_vox = self.habitat2voxel(obj_center)
+                ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
+            # plot the target point if found
+            if self.target_point is not None:
+                ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
+            ax1.set_title("Unoccupied")
 
-        ax2.imshow(island)
-        for frontier in self.frontiers:
-            if frontier.image is not None:
-                ax2.scatter(frontier.position[1], frontier.position[0], color="g", s=50, alpha=1)
-            else:
-                ax2.scatter(frontier.position[1], frontier.position[0], color="r", s=50, alpha=1)
-        ax2.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax2.set_title("Island")
+            ax2.imshow(island)
+            for frontier in self.frontiers:
+                if frontier.image is not None:
+                    ax2.scatter(frontier.position[1], frontier.position[0], color="g", s=50, alpha=1)
+                else:
+                    ax2.scatter(frontier.position[1], frontier.position[0], color="r", s=50, alpha=1)
+            ax2.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
+            ax2.set_title("Island")
 
-        ax3.imshow(unexplored_neighbors)
-        for point in frontiers_pre_cluster:
-            ax3.scatter(point[1], point[0], color="white", s=20, alpha=1)
-        for frontier in self.frontiers:
-            ax3.scatter(frontier.position[1], frontier.position[0], color="m", s=10, alpha=1)
-            normal = frontier.orientation
-            dx, dy = normal * 4
-            ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='m')
-        ax3.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
-        ax3.set_title("Unexplored neighbors")
+            ax3.imshow(unexplored_neighbors)
+            for point in frontiers_pre_cluster:
+                ax3.scatter(point[1], point[0], color="white", s=20, alpha=1)
+            for frontier in self.frontiers:
+                ax3.scatter(frontier.position[1], frontier.position[0], color="m", s=10, alpha=1)
+                normal = frontier.orientation
+                dx, dy = normal * 4
+                ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='m')
+            ax3.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax3.set_title("Unexplored neighbors")
 
-        im = ax4.imshow(val_vol_2d)
-        for frontier in self.frontiers:
-            ax4.scatter(frontier.position[1], frontier.position[0], color="white", s=20, alpha=1)
-            normal = frontier.orientation
-            dx, dy = normal * 4
-            ax4.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
-        fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
-        ax4.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
-        ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-        ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
-        ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
-        ax4.quiver(
-            next_point[1],
-            next_point[0],
-            direction[1],
-            direction[0],
-            color="r",
-            scale=5,
-            angles="xy",
-            alpha=0.2,
-        )
-        ax4.set_title("Current sem values")
+            im = ax4.imshow(val_vol_2d)
+            for frontier in self.frontiers:
+                ax4.scatter(frontier.position[1], frontier.position[0], color="white", s=20, alpha=1)
+                normal = frontier.orientation
+                dx, dy = normal * 4
+                ax4.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
+            fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
+            ax4.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
+            ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
+            ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+            ax4.quiver(
+                next_point[1],
+                next_point[0],
+                direction[1],
+                direction[0],
+                color="r",
+                scale=5,
+                angles="xy",
+                alpha=0.2,
+            )
+            ax4.set_title("Current sem values")
 
-        im = ax5.imshow(island)
-        ax5.set_title("Path on island")
+            im = ax5.imshow(island)
+            ax5.set_title("Path on island")
 
-        frontier_weights = np.zeros_like(val_vol_2d)
-        for frontier, weight in zip(self.frontiers, frontiers_weight):
-            frontier_weights[frontier.position[0], frontier.position[1]] = weight
-        im = ax6.imshow(frontier_weights)
-        # draw path points
-        for i_pp in range(len(path_points) - 1):
-            p1 = (path_points[i_pp] - self._vol_origin[:2]) / self._voxel_size
-            p2 = (path_points[i_pp + 1] - self._vol_origin[:2]) / self._voxel_size
-            ax6.arrow(p1[1], p1[0], p2[1] - p1[1], p2[0] - p1[0], color="r", width=0.1, head_width=0.8, head_length=0.8)
+            frontier_weights = np.zeros_like(val_vol_2d)
+            for frontier, weight in zip(self.frontiers, frontiers_weight):
+                frontier_weights[frontier.position[0], frontier.position[1]] = weight
+            im = ax6.imshow(frontier_weights)
+            # draw path points
+            for i_pp in range(len(path_points) - 1):
+                p1 = (path_points[i_pp] - self._vol_origin[:2]) / self._voxel_size
+                p2 = (path_points[i_pp + 1] - self._vol_origin[:2]) / self._voxel_size
+                ax6.arrow(p1[1], p1[0], p2[1] - p1[1], p2[0] - p1[0], color="r", width=0.1, head_width=0.8, head_length=0.8)
 
-        fig.colorbar(im, orientation="vertical", ax=ax6, fraction=0.046, pad=0.04)
-        # ax6.scatter(max_point[1], max_point[0], c="r", s=20, label="max")
-        ax6.set_title("Frontier weights")
+            fig.colorbar(im, orientation="vertical", ax=ax6, fraction=0.046, pad=0.04)
+            # ax6.scatter(max_point[1], max_point[0], c="r", s=20, label="max")
+            ax6.set_title("Frontier weights")
 
         # Convert back to world coordinates
         next_point_normal = next_point * self._voxel_size + self._vol_origin[:2]
@@ -1042,7 +1053,10 @@ class TSDFPlanner:
         # update the path points
         updated_path_points = self.update_path_points(path_points, next_point_normal)
 
-        return next_point_normal, next_yaw, next_point, fig, updated_path_points
+        if not return_choice:
+            return next_point_normal, next_yaw, next_point, fig, updated_path_points
+        else:
+            return next_point_normal, next_yaw, next_point, fig, updated_path_points, max_point
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""

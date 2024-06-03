@@ -21,7 +21,7 @@ margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
 save_obs: true
-save_frontier: true
+save_frontier: false
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -29,11 +29,11 @@ stop_max_bias_from_center: 0.3  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.5
-max_step_room_size_ratio: 3
+max_step_dist_ratio: 2.5
 black_pixel_ratio: 0.5
 min_random_init_steps: 2
-extra_view_phase_1: 3
-extra_view_angle_deg_phase_1: 90
+extra_view_phase_1: 2
+extra_view_angle_deg_phase_1: 60
 extra_view_phase_2: 5  # in phase 2, have more observations
 extra_view_angle_deg_phase_2: 60
 

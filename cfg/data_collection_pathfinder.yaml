@@ -6,6 +6,7 @@ question_data_path: "generated_questions"
 scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d"
 semantic_bbox_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged"
+dataset_output_dir: "exploration_data"
 
 # Sample navigation point
 min_travel_dist: 5.0
@@ -21,7 +22,7 @@ margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
 save_obs: true
-save_frontier: true
+save_visualization: false
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -29,11 +30,11 @@ stop_max_bias_from_center: 0.3  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.5
-max_step_room_size_ratio: 3
+max_step_dist_ratio: 2.5
 black_pixel_ratio: 0.5
 min_random_init_steps: 2
-extra_view_phase_1: 3
-extra_view_angle_deg_phase_1: 90
+extra_view_phase_1: 2
+extra_view_angle_deg_phase_1: 60
 extra_view_phase_2: 5  # in phase 2, have more observations
 extra_view_angle_deg_phase_2: 60
 
@@ -65,6 +66,7 @@ planner:
   max_unoccupied_check_frontier: 1
   min_frontier_area: 8
   final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
+  return_choice: true  # always set to true to return max_point
 
 visual_prompt:
   cluster_threshold: 1.0
