@@ -66,7 +66,7 @@ def main(cfg):
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
         # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
         # all_questions_in_scene = all_questions_in_scene[22:]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if "00324" not in q['question_id']]
+        all_questions_in_scene = [q for q in all_questions_in_scene if "00324" not in q['question_id']]
         ##########################################################
 
         # load scene

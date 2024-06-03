@@ -23,7 +23,7 @@ from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_
 
 def main(cfg):
     # scene_list = ['00800-TEEsavR23oF']
-    scene_list = ['00324-DoSbsoo4EAg', '00606-W16Bm4ysK8v', '00669-DNWbUAJYsPy']
+    scene_list = ['00657-TSJmdttd2GV', '00366-fxbzYAGkrtm', '00109-GTV2Y73Sn5t']
     question_categories = ['object_recognition', 'object_state_recognition', 'attribute_recognition',
                            'functional_reasoning', 'object_localization', 'spatial_understanding']
     sys_prompt = "You are a helpful assistant."
