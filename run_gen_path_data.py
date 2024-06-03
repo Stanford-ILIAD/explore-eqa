@@ -65,8 +65,8 @@ def main(cfg):
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
         # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
-        all_questions_in_scene = all_questions_in_scene[8:]
-        all_questions_in_scene = [q for q in all_questions_in_scene if "00324" not in q['question_id']]
+        # all_questions_in_scene = all_questions_in_scene[22:]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if "00324" not in q['question_id']]
         ##########################################################
 
         # load scene
@@ -130,7 +130,7 @@ def main(cfg):
 
             # get a navigation start point
             start_position, path_points = get_navigable_point_to(
-                target_position, pathfinder, max_search=1000, min_dist=6
+                target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist
             )
             if start_position is None or path_points is None:
                 logging.info(f"Cannot find a navigable path to the target object in question {question_data['question_id']}")
