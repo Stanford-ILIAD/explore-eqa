@@ -300,26 +300,6 @@
         ]
     },
     {
-        "question_id": "00606-W16Bm4ysK8v_276_clothes_dryer_572722",
-        "episode_history": "00606-W16Bm4ysK8v",
-        "category": "object state recognition",
-        "question": "Is the door of the clothes dryer next to the washing machine in the laundry room closed?",
-        "answer": "No.",
-        "object_id": 276,
-        "class": "clothes dryer",
-        "position": [
-            3.110264301300049,
-            -0.13557636737823486,
-            3.7425355911254883
-        ],
-        "rotation": [
-            0.0,
-            0.06663862070594935,
-            0.0,
-            0.9977771766433668
-        ]
-    },
-    {
         "question_id": "00606-W16Bm4ysK8v_299_boiler_304943",
         "episode_history": "00606-W16Bm4ysK8v",
         "category": "functional reasoning",

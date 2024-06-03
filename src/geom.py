@@ -4,6 +4,7 @@ import scipy.ndimage as ndimage
 import heapq
 import math
 from src.habitat import pos_habitat_to_normal
+from sklearn.cluster import DBSCAN
 
 
 def get_scene_bnds(pathfinder, floor_height):
@@ -336,3 +337,57 @@ def get_nearest_true_point(point, bool_map):
             return np.array([x + dx_horizon, y + dy_horizon])
         else:
             return np.array([x + dx_vertical, y + dy_vertical])
+
+
+def get_proper_observe_point(point, unoccupied_map, dist=10):
+    # Get a proper observation point at dist
+    # the observation point should not near the wall, so it's a bit tricky
+    # point, dist are all in voxel space
+    unoccupied_coords = np.argwhere(unoccupied_map)  # [N, 2]
+    dists = np.linalg.norm(unoccupied_coords - point, axis=1)  # [N]
+    valid_coords = unoccupied_coords[dists < dist]  # [N, 2]
+
+    # cluster the points
+    if len(valid_coords) == 0:
+        return None
+    clustering = DBSCAN(eps=1, min_samples=1).fit(valid_coords)
+    labels = clustering.labels_
+    unique_labels = np.unique(labels)
+    # get the largest cluster
+    max_cluster_id = -1
+    max_cluster_size = 0
+    for cluster_id in unique_labels:
+        cluster_size = np.sum(labels == cluster_id)
+        if cluster_size > max_cluster_size:
+            max_cluster_size = cluster_size
+            max_cluster_id = cluster_id
+    if max_cluster_id == -1:
+        return None
+    max_cluster_coords = valid_coords[labels == max_cluster_id]
+    max_cluster_center = np.mean(max_cluster_coords, axis=0)
+
+    direction = max_cluster_center - point
+    direction = direction / np.linalg.norm(direction)
+    final_point = point + direction * dist
+
+    # ensure the final point is navigable
+    final_point = get_nearest_true_point(final_point, unoccupied_map)
+    return final_point
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

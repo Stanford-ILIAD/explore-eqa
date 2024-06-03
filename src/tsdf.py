@@ -2,8 +2,6 @@
 # Copyright (c) 2018 Andy Zeng
 # Source: https://github.com/andyzeng/tsdf-fusion-python/blob/master/fusion.py
 # BSD 2-Clause License
-import copy
-
 # Copyright (c) 2019, Princeton University
 # All rights reserved.
 
@@ -31,6 +29,7 @@ import copy
 import numpy as np
 from numba import njit, prange
 import random
+import copy
 import logging
 import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
@@ -44,7 +43,8 @@ from .geom import (
     rigid_transform,
     run_dijkstra,
     fps,
-    get_nearest_true_point
+    get_nearest_true_point,
+    get_proper_observe_point
 )
 from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
@@ -60,6 +60,7 @@ class Frontier:
     orientation: np.ndarray  # directional vector of the frontier in float
     image: Optional[str]
     area: int
+    visited: bool = False  # whether the frontier has been visited before
 
     def __eq__(self, other):
         if not isinstance(other, Frontier):
@@ -612,7 +613,8 @@ class TSDFPlanner:
         val_dir_T=0.5,
         dist_T=10,
         min_dist_from_cur=0.5,
-        max_dist_from_cur=3,
+        max_dist_from_cur_phase_1=3,
+        max_dist_from_cur_phase_2=1,
         frontier_spacing=1.5,
         frontier_min_neighbors=3,
         frontier_max_neighbors=4,
@@ -622,6 +624,7 @@ class TSDFPlanner:
         smooth_sigma=5,
         eps=0.5,
         min_frontier_area=6,
+        final_observe_distance=1.0,
         **kwargs,
     ):
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
@@ -713,8 +716,11 @@ class TSDFPlanner:
         # determine whether the target object is in scene graph
         if target_obj_id in self.simple_scene_graph.keys():
             target_point = self.habitat2voxel(self.simple_scene_graph[target_obj_id])[:2]
-            # set the object center as the navigation target
-            target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
+            # # set the object center as the navigation target
+            # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
+            # since it's not proper to directly go to the target point,
+            # we'd better find a navigable point that is certain distance from it to better observe the target
+            target_navigable_point = get_proper_observe_point(target_point, unoccupied, dist=final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
                 raise ValueError("No unoccupied point is found in the scene")
@@ -798,6 +804,10 @@ class TSDFPlanner:
                 if frontier.area < min_frontier_area:
                     weight *= 1e-3
 
+                # if the frontier is visited before, ignore it
+                if frontier.visited:
+                    weight *= 1e-3
+
                 # Save weight
                 frontiers_weight = np.append(frontiers_weight, weight)
             logging.info(f"Number of frontiers for next pose: {len(self.frontiers)}")
@@ -833,41 +843,53 @@ class TSDFPlanner:
                     # find the direction into unexplored
                     ft_direction = max_point.orientation
 
-                    # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
-                    # there is a chance that the point is outside the free space
+                    # The following code add backtrack to the frontier
+                    # # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
+                    # # there is a chance that the point is outside the free space
+                    # next_point = np.array(max_point.position, dtype=float)
+                    # max_backtrack = int(frontier_spacing / self._voxel_size)
+                    # num_backtrack = 0
+                    # best_clearance_backtrack_point = None
+                    # best_clearance = 0
+                    # clearance = 0
+                    # # traverse all the backtrack points, and find the valid point with the largest clearance ahead
+                    # while num_backtrack < max_backtrack:
+                    #     next_point -= ft_direction
+                    #     num_backtrack += 1
+                    #
+                    #     # if the point is invalid
+                    #     if (occupied[int(next_point[0]), int(next_point[1])]
+                    #         or not island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
+                    #         or not self.check_within_bnds(next_point)  # out of bound of the map
+                    #     ):
+                    #         clearance = 0
+                    #         continue
+                    #     else:
+                    #         clearance += 1
+                    #         if clearance > best_clearance:
+                    #             best_clearance = clearance
+                    #             best_clearance_backtrack_point = next_point.copy()
+                    # if best_clearance_backtrack_point is None:
+                    #     # all points backward are invalid
+                    #     # so just skip this frontier
+                    #     logging.info("All points backward are invalid, skip this frontier!!!!!")
+                    #     continue
+
+                    # next_point = np.round(best_clearance_backtrack_point).astype(int)
+
+                    # this try not backtrack
                     next_point = np.array(max_point.position, dtype=float)
-                    max_backtrack = int(frontier_spacing / self._voxel_size)
-                    num_backtrack = 0
-                    best_clearance_backtrack_point = None
-                    best_clearance = 0
-                    clearance = 0
-                    # traverse all the backtrack points, and find the valid point with the largest clearance ahead
-                    while num_backtrack < max_backtrack:
+                    while (
+                        occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))] or
+                        not island[int(np.round(next_point[0])), int(np.round(next_point[1]))] or
+                        not self.check_within_bnds(next_point)
+                    ):
                         next_point -= ft_direction
-                        num_backtrack += 1
 
-                        # if the point is invalid
-                        if (occupied[int(next_point[0]), int(next_point[1])]
-                            or not island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
-                            or not self.check_within_bnds(next_point)  # out of bound of the map
-                        ):
-                            clearance = 0
-                            continue
-                        else:
-                            clearance += 1
-                            if clearance > best_clearance:
-                                best_clearance = clearance
-                                best_clearance_backtrack_point = next_point.copy()
-                    if best_clearance_backtrack_point is None:
-                        # all points backward are invalid
-                        # so just skip this frontier
-                        logging.info("All points backward are invalid, skip this frontier!!!!!")
-                        continue
-
-                    next_point = np.round(best_clearance_backtrack_point).astype(int)
+                    next_point = np.round(next_point).astype(int)
                     if (
                         self.check_within_bnds(next_point)
-                        and island[int(next_point[0]), int(next_point[1])]
+                        and island[next_point[0], next_point[1]]
                     ):
                         break  # stop searching
 
@@ -885,7 +907,11 @@ class TSDFPlanner:
         # check the distance to next navigation point
         # if the target navigation point is too far
         # then just go to a point between the current point and the target point
+        max_dist_from_cur = max_dist_from_cur_phase_1 if self.target_point is None else max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
         dist, path_to_target = self.get_distance(cur_point[:2], next_point, height=pts[2], pathfinder=pathfinder)
+        # drop the y value of the path to avoid errors when calculating seg_length
+        path_to_target = [np.asarray([p[0], 0.0, p[2]]) for p in path_to_target]
+
         if dist > max_dist_from_cur:
             if path_to_target is not None:
                 # if the pathfinder find a path, then just walk along the path for max_dist_from_cur distance
@@ -925,6 +951,10 @@ class TSDFPlanner:
             # normal direction from next point to max point
             direction = max_point.position - next_point
         direction = direction / np.linalg.norm(direction)
+
+        # mark the max point as visited if it is a frontier
+        if type(max_point) == Frontier:
+            max_point.visited = True
 
         # Plot
         fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))

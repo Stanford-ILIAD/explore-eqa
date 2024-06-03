@@ -36,6 +36,12 @@ from src.vlm import VLM
 from src.tsdf import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
 
+'''
+tricky case list:
+00606-W16Bm4ysK8v_276_clothes_dryer_572722 there's stairs in the floor, so the tsdfplanner cannot work currently
+00324-DoSbsoo4EAg_240_cutting_board_878397 when walking along the wall, the left/right camera cannot capture valid images (maybe due to habitat)
+'''
+
 
 def main(cfg):
     camera_tilt = cfg.camera_tilt_deg * np.pi / 180
@@ -55,8 +61,13 @@ def main(cfg):
     for scene_id in all_scene_list:
         all_questions_in_scene = [q for q in questions_data if q["episode_history"] == scene_id]
 
-        rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
-        all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
+        ##########################################################
+        # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
+        # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
+        all_questions_in_scene = all_questions_in_scene[8:]
+        all_questions_in_scene = [q for q in all_questions_in_scene if "00324" not in q['question_id']]
+        ##########################################################
 
         # load scene
         split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
@@ -162,8 +173,12 @@ def main(cfg):
                 logging.info(f"\n== step: {cnt_step}")
 
                 # for each position, get the views from different angles
-                angle_increment = cfg.extra_view_angle_deg * np.pi / 180
-                total_views = 1 + cfg.extra_view
+                if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                    angle_increment = cfg.extra_view_angle_deg_phase_2 * np.pi / 180
+                    total_views = 1 + cfg.extra_view_phase_2
+                else:
+                    angle_increment = cfg.extra_view_angle_deg_phase_1 * np.pi / 180
+                    total_views = 1 + cfg.extra_view_phase_1
                 all_angles = [angle + angle_increment * (i - total_views // 2) for i in range(total_views)]
                 # let the main viewing angle be the last one to avoid potential overwriting problems
                 main_angle = all_angles.pop(total_views // 2)
@@ -199,7 +214,9 @@ def main(cfg):
                     if target_obj_pix_ratio > 0:
                         obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
                         bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
-                        if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.all(np.abs(bias_from_center) < cfg.stop_max_bias_from_center):
+                        # currently just consider that the object should be in around the horizontal center, not the vertical center
+                        # due to the viewing angle difference
+                        if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
                             logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
                             target_found = True
 
