@@ -373,6 +373,18 @@ def main(cfg):
                     plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
                     plt.close()
 
+                if cfg.save_frontier_video:
+                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                    os.makedirs(frontier_video_path, exist_ok=True)
+                    if type(max_point_choice) == Frontier:
+                        img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
+                        os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
+                    else:  # navigating to the objects
+                        if cfg.save_obs:
+                            img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
+                            if os.path.exists(img_path):
+                                os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
+
                 # update position and rotation
                 pts_normal = np.append(pts_normal, floor_height)
                 pts = pos_normal_to_habitat(pts_normal)
@@ -385,7 +397,8 @@ def main(cfg):
                 logging.info(f"Question id {question_data['question_id']} finish with {cnt_step} steps")
             else:
                 logging.info(f"Question id {question_data['question_id']} failed.")
-                os.system(f"rm -r {episode_data_dir}")
+                if cfg.del_fail_case:
+                    os.system(f"rm -r {episode_data_dir}")
 
         logging.info(f'Scene {scene_id} finish')
 
