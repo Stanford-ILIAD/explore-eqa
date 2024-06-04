@@ -22,7 +22,7 @@ margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
 save_obs: true
-save_visualization: false
+save_visualization: true
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -31,7 +31,7 @@ stop_max_bias_from_center: 0.3  # the target object should be within 60% of the 
 # Navigation
 init_clearance: 0.5
 max_step_dist_ratio: 2.5
-black_pixel_ratio: 0.5
+black_pixel_ratio: 0.05
 min_random_init_steps: 2
 extra_view_phase_1: 2
 extra_view_angle_deg_phase_1: 60
@@ -59,14 +59,17 @@ planner:
   min_dist_from_cur: 0.5
   max_dist_from_cur_phase_1: 1  # when the target object is not found, explore the frontiers with this step length
   max_dist_from_cur_phase_2: 0.4  # when the target object is found, go to the target object with this step length
+  max_unexplored_check_frontier: 3
+  max_unoccupied_check_frontier: 1
+  final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
+  return_choice: true  # always set to true to return max_point
+
+  # about frontier selection
   frontier_spacing: 0.5
   frontier_min_neighbors: 8
   frontier_max_neighbors: 9
-  max_unexplored_check_frontier: 3
-  max_unoccupied_check_frontier: 1
   min_frontier_area: 8
-  final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
-  return_choice: true  # always set to true to return max_point
+
 
 visual_prompt:
   cluster_threshold: 1.0

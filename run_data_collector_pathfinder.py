@@ -234,6 +234,12 @@ def main(cfg):
                     depth = obs["depth_sensor"]
                     semantic_obs = obs["semantic_sensor"]
 
+                    # check whether the observation is valid
+                    black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
+                    if black_pix_ratio > cfg.black_pixel_ratio:
+                        logging.info(f"Black pixel ratio {black_pix_ratio} is too high, skip this view")
+                        continue
+
                     # check stop condition
                     target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
                     if target_obj_pix_ratio > 0:
@@ -249,6 +255,17 @@ def main(cfg):
                     masked_ids = np.unique(semantic_obs[depth > 5.0])
                     semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
                     tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
+
+                    # TSDF fusion
+                    tsdf_planner.integrate(
+                        color_im=rgb,
+                        depth_im=depth,
+                        cam_intr=cam_intr,
+                        cam_pose=cam_pose_tsdf,
+                        obs_weight=1.0,
+                        margin_h=int(cfg.margin_h_ratio * img_height),
+                        margin_w=int(cfg.margin_w_ratio * img_width),
+                    )
 
                     if cfg.save_obs:
                         observation_save_dir = os.path.join(episode_data_dir, 'observations')
@@ -269,19 +286,6 @@ def main(cfg):
                     if target_found:
                         break
 
-                    num_black_pixels = np.sum(np.sum(rgb, axis=-1) == 0)  # sum over channel first
-                    if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
-                        # TSDF fusion
-                        tsdf_planner.integrate(
-                            color_im=rgb,
-                            depth_im=depth,
-                            cam_intr=cam_intr,
-                            cam_pose=cam_pose_tsdf,
-                            obs_weight=1.0,
-                            margin_h=int(cfg.margin_h_ratio * img_height),
-                            margin_w=int(cfg.margin_w_ratio * img_width),
-                        )
-
                 if target_found:
                     break
 
@@ -298,9 +302,9 @@ def main(cfg):
                     path_points=path_points,
                     pathfinder=pathfinder,
                     target_obj_id=target_obj_id,
-                    flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
+                    cfg=cfg.planner,
                     save_visualization=cfg.save_visualization,
-                    **cfg.planner,
+                    return_choice=True
                 )
                 if return_values[0] is None:
                     logging.info(f"Question id {question_data['question_id']} invalid!")

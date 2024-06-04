@@ -608,26 +608,9 @@ class TSDFPlanner:
         path_points,
         pathfinder,
         target_obj_id,
+        cfg,
         flag_no_val_weight=False,
         save_visualization=True,
-        unexplored_T=0.5,
-        unoccupied_T=3,
-        val_T=0.5,
-        val_dir_T=0.5,
-        dist_T=10,
-        min_dist_from_cur=0.5,
-        max_dist_from_cur_phase_1=3,
-        max_dist_from_cur_phase_2=1,
-        frontier_spacing=1.5,
-        frontier_min_neighbors=3,
-        frontier_max_neighbors=4,
-        max_unexplored_check_frontier=3.0,
-        max_unoccupied_check_frontier=1.0,
-        max_val_check_frontier=5.0,
-        smooth_sigma=5,
-        eps=0.5,
-        min_frontier_area=6,
-        final_observe_distance=1.0,
         return_choice=False,
         **kwargs,
     ):
@@ -657,13 +640,13 @@ class TSDFPlanner:
         val_vol_2d = np.max(self._val_vol_cpu, axis=2).copy()
 
         # smoothen the map
-        val_vol_2d = gaussian_filter(val_vol_2d, sigma=smooth_sigma)
+        val_vol_2d = gaussian_filter(val_vol_2d, sigma=cfg.smooth_sigma)
 
         # detect and update frontiers
         frontiers_regions = np.argwhere(
             island
-            & (unexplored_neighbors >= frontier_min_neighbors)
-            & (unexplored_neighbors <= frontier_max_neighbors)
+            & (unexplored_neighbors >= cfg.frontier_min_neighbors)
+            & (unexplored_neighbors <= cfg.frontier_max_neighbors)
         )
         frontiers_pre_cluster = frontiers_regions.copy()
 
@@ -673,7 +656,7 @@ class TSDFPlanner:
             return (None,)
 
         # cluster frontier regions
-        db = DBSCAN(eps=eps, min_samples=2).fit(frontiers_regions)
+        db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontiers_regions)
         labels = db.labels_
         # get one point from each cluster
         frontier_list = []
@@ -729,7 +712,7 @@ class TSDFPlanner:
             # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
             # since it's not proper to directly go to the target point,
             # we'd better find a navigable point that is certain distance from it to better observe the target
-            target_navigable_point = get_proper_observe_point(target_point, unoccupied, dist=final_observe_distance / self._voxel_size)
+            target_navigable_point = get_proper_observe_point(target_point, unoccupied, dist=cfg.final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
                 return (None,)
@@ -747,7 +730,7 @@ class TSDFPlanner:
                 normal = frontier.orientation
 
                 # Then check how much unoccupied in that direction
-                max_pixel_check = int(max_unoccupied_check_frontier / self._voxel_size)
+                max_pixel_check = int(cfg.max_unoccupied_check_frontier / self._voxel_size)
                 dir_pts = np.round(
                     frontier.position + np.arange(max_pixel_check)[:, np.newaxis] * normal
                 ).astype(int)
@@ -758,7 +741,7 @@ class TSDFPlanner:
                 )
 
                 # Check the ratio of unexplored in the direction, until hits obstacle
-                max_pixel_check = int(max_unexplored_check_frontier / self._voxel_size)
+                max_pixel_check = int(cfg.max_unexplored_check_frontier / self._voxel_size)
                 dir_pts = np.round(
                     frontier.position + np.arange(max_pixel_check)[:, np.newaxis] * normal
                 ).astype(int)
@@ -787,8 +770,8 @@ class TSDFPlanner:
                 closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal, pathfinder, pts[2])
 
                 # Get weight - unexplored, unoccupied, and value
-                weight = np.exp(unexplored_rate / unexplored_T)  # [0-1] before T
-                weight *= np.exp(unoccupied_rate / unoccupied_T)  # [0-1] before T
+                weight = np.exp(unexplored_rate / cfg.unexplored_T)  # [0-1] before T
+                weight *= np.exp(unoccupied_rate / cfg.unoccupied_T)  # [0-1] before T
                 # if not flag_no_val_weight:
                 #     weight *= np.exp(
                 #         val_vol_2d[point[0], point[1]] / val_T
@@ -802,15 +785,15 @@ class TSDFPlanner:
                 # Check distance to current point - make weight very small if too close and aligned
                 dist = np.sqrt((cur_point[0] - frontier.position[0]) ** 2 + (cur_point[1] - frontier.position[1]) ** 2)
                 pts_angle = np.arctan2(normal[1], normal[0]) - np.pi / 2
-                weight *= np.exp(-dist / dist_T)
+                weight *= np.exp(-dist / cfg.dist_T)
                 if (
-                    dist < min_dist_from_cur / self._voxel_size
+                    dist < cfg.min_dist_from_cur / self._voxel_size
                     and np.abs(angle - pts_angle) < np.pi / 6
                 ):
                     weight *= 1e-3
 
                 # if frontier is too small, ignore it
-                if frontier.area < min_frontier_area:
+                if frontier.area < cfg.min_frontier_area:
                     weight *= 1e-3
 
                 # if the frontier is visited before, ignore it
@@ -916,7 +899,7 @@ class TSDFPlanner:
         # check the distance to next navigation point
         # if the target navigation point is too far
         # then just go to a point between the current point and the target point
-        max_dist_from_cur = max_dist_from_cur_phase_1 if self.target_point is None else max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
+        max_dist_from_cur = cfg.max_dist_from_cur_phase_1 if self.target_point is None else cfg.max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
         dist, path_to_target = self.get_distance(cur_point[:2], next_point, height=pts[2], pathfinder=pathfinder)
         # drop the y value of the path to avoid errors when calculating seg_length
         path_to_target = [np.asarray([p[0], 0.0, p[2]]) for p in path_to_target]
