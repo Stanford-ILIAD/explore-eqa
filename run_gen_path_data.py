@@ -33,7 +33,7 @@ from src.habitat import (
 )
 from src.geom import get_cam_intr, get_scene_bnds
 from src.vlm import VLM
-from src.tsdf import TSDFPlanner
+from src.tsdf_tempt import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
 
 '''
@@ -67,7 +67,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00366-fxbzYAGkrtm_195_ventilation_hood_574025']
+        all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_71_exercise_bike_501579']
         # all_questions_in_scene = all_questions_in_scene[6:]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
@@ -217,6 +217,12 @@ def main(cfg):
                     depth = obs["depth_sensor"]
                     semantic_obs = obs["semantic_sensor"]
 
+                    # check whether the observation is valid
+                    black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
+                    if black_pix_ratio > cfg.black_pixel_ratio:
+                        logging.info(f"Black pixel ratio {black_pix_ratio} is too high, skip this view")
+                        continue
+
                     # check stop condition
                     target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
                     if target_obj_pix_ratio > 0:
@@ -232,6 +238,18 @@ def main(cfg):
                     masked_ids = np.unique(semantic_obs[depth > 5.0])
                     semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
                     tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
+
+                    # TSDF fusion
+                    tsdf_planner.integrate(
+                        color_im=rgb,
+                        depth_im=depth,
+                        cam_intr=cam_intr,
+                        cam_pose=cam_pose_tsdf,
+                        obs_weight=1.0,
+                        margin_h=int(cfg.margin_h_ratio * img_height),
+                        margin_w=int(cfg.margin_w_ratio * img_width),
+                    )
+
                     if cfg.save_obs:
                         if target_found:
                             plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), rgb)
@@ -249,89 +267,6 @@ def main(cfg):
                     if target_found:
                         break
 
-                    num_black_pixels = np.sum(np.sum(rgb, axis=-1) == 0)  # sum over channel first
-                    if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
-                        # TSDF fusion
-                        tsdf_planner.integrate(
-                            color_im=rgb,
-                            depth_im=depth,
-                            cam_intr=cam_intr,
-                            cam_pose=cam_pose_tsdf,
-                            obs_weight=1.0,
-                            margin_h=int(cfg.margin_h_ratio * img_height),
-                            margin_w=int(cfg.margin_w_ratio * img_width),
-                        )
-
-                        # Get VLM prediction
-                        # rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
-                        #
-                        # # Get frontier candidates
-                        # prompt_points_pix = []
-                        # if cfg.use_active:
-                        #     prompt_points_pix, fig = (
-                        #         tsdf_planner.find_prompt_points_within_view(
-                        #             pts_normal,
-                        #             img_width,
-                        #             img_height,
-                        #             cam_intr,
-                        #             cam_pose_tsdf,
-                        #             **cfg.visual_prompt,
-                        #         )
-                        #     )
-                        #     fig.tight_layout()
-                        #     plt.savefig(
-                        #         os.path.join(
-                        #             episode_data_dir, "{}_prompt_points.png".format(cnt_step)
-                        #         )
-                        #     )
-                        #     plt.close()
-                        #
-                        # # Visual prompting
-                        # draw_letters = ["1", "2", "3", "4"]  # always four
-                        # fnt = ImageFont.truetype(
-                        #     "data/Open_Sans/static/OpenSans-Regular.ttf",
-                        #     30,
-                        # )
-                        # actual_num_prompt_points = len(prompt_points_pix)
-                        # # if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
-                        # if True:
-                        #     rgb_im_draw = rgb_im.copy()
-                        #     draw = ImageDraw.Draw(rgb_im_draw)
-                        #     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        #         draw.text(
-                        #             tuple(point_pix.astype(int).tolist()),
-                        #             draw_letters[prompt_point_ind],
-                        #             font=fnt,
-                        #             fill=(255, 0, 0, 255),
-                        #             anchor="mm",
-                        #             font_size=15,
-                        #         )
-                        #
-                        #     rgb_im_draw.save(
-                        #         os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
-                        #     )
-                        #
-                        #     for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        #         # logging.info(f"Prompt point {prompt_point_ind}: {point_pix}")
-                        #         width = 640
-                        #         height = 480
-                        #         size = 100
-                        #         rgb_im_draw_cropped = rgb_im.crop(
-                        #             (
-                        #                 max(point_pix[0] - size, 0),
-                        #                 max(point_pix[1] - size, 0),
-                        #                 min(point_pix[0] + size, width),
-                        #                 min(point_pix[1] + size, height),
-                        #             )
-                        #         )
-                        #         rgb_im_draw_cropped.save(
-                        #             os.path.join(
-                        #                 episode_data_dir, f"{cnt_step}_draw_{prompt_point_ind}.png"
-                        #             )
-                        #         )
-                        #
-                        #     logging.info(f"Figure saved")
-
                 if target_found:
                     break
 
@@ -342,8 +277,7 @@ def main(cfg):
                     path_points=path_points,
                     pathfinder=pathfinder,
                     target_obj_id=target_obj_id,
-                    flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
-                    **cfg.planner,
+                    cfg=cfg.planner
                 )
                 if cfg.save_frontier:
                     # Turn to face each frontier point and get rgb image

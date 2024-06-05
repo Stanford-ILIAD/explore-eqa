@@ -374,6 +374,35 @@ def get_proper_observe_point(point, unoccupied_map, dist=10):
     final_point = get_nearest_true_point(final_point, unoccupied_map)
     return final_point
 
+def get_warping_gap(angles, tolerance_degree=30, max_try=1000):
+    # angles: [N], should be sorted
+    tolerance = tolerance_degree / 180 * np.pi
+    angles = np.asarray(angles)
+    angles = np.sort(angles)
+    if angles[-1] - angles[0] > 1.95 * np.pi:
+        # need to wrap the group of angles
+        # randomly select one angle that perfectly splits the angles into two groups
+        ang = None
+        for _ in range(max_try):
+            ang = random.uniform(-np.pi, np.pi)
+            if np.sum((ang - tolerance / 2 < angles) & (angles < ang + tolerance / 2)) == 0:
+                break
+        return ang
+    else:
+        # no need to wrap
+        return None
+
+def get_angle_span(angles):
+    # angles: [N], range from -pi to pi
+    normalized_angles = [(angle + 2 * np.pi) % (2 * np.pi) for angle in angles]
+    normalized_angles = np.sort(normalized_angles)
+
+    differences = np.diff(normalized_angles)
+    differences = np.append(differences, normalized_angles[0] + 2 * np.pi - normalized_angles[-1])
+
+    max_gap = np.max(differences)
+
+    return 2 * np.pi - max_gap
 
 
 
