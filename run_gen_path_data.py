@@ -67,8 +67,8 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_71_exercise_bike_501579']
-        # all_questions_in_scene = all_questions_in_scene[6:]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_86_stuffed_animal_271786']
+        all_questions_in_scene = all_questions_in_scene[3:]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 

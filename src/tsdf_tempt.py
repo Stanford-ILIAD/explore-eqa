@@ -742,7 +742,7 @@ class TSDFPlanner:
             # for each valid angle, create a frontier
             for ft_data in valid_ft_angles:
                 self.frontiers.append(
-                    self.create_frontier(ft_data, frontier_edge_areas, cur_point)
+                    self.create_frontier(ft_data, island_map=island, cur_point=cur_point)
                 )
 
         # subsample
@@ -1308,21 +1308,44 @@ class TSDFPlanner:
             region_map[coord[0], coord[1]] = True
         return region_map
 
-    def create_frontier(self, ft_data: dict, frontier_edge_areas, cur_point) -> Frontier:
+    def create_frontier(self, ft_data: dict, island_map, cur_point) -> Frontier:
         ft_direction = np.array([np.cos(ft_data['angle']), np.sin(ft_data['angle'])])
         # frontier center is the point on the frontier_edge_area that has the nearest polar angle to ft_angle
-        center = frontier_edge_areas[
-            np.argmin(
-                np.abs(
-                    np.arctan2(
-                        frontier_edge_areas[:, 1] - cur_point[1],
-                        frontier_edge_areas[:, 0] - cur_point[0],
-                    )
-                    - ft_data['angle']
-                )
-            )
-        ]
+        # center = frontier_edge_areas[
+        #     np.argmin(
+        #         np.abs(
+        #             np.arctan2(
+        #                 frontier_edge_areas[:, 1] - cur_point[1],
+        #                 frontier_edge_areas[:, 0] - cur_point[0],
+        #             )
+        #             - ft_data['angle']
+        #         )
+        #     )
+        # ]
         region = ft_data['region']
+        ft_indices = np.argwhere(region)
+        # take the one that is the closest to mean as the center of the cluster
+        dist = np.sqrt(
+            (ft_indices[:, 0] - np.mean(ft_indices[:, 0])) ** 2
+            + (ft_indices[:, 1] - np.mean(ft_indices[:, 1])) ** 2
+        )
+        min_dist_rank = np.argsort(dist)
+        center = None
+        while True:
+            if len(min_dist_rank) == 0:
+                break
+            center = ft_indices[min_dist_rank[0]]
+            if island_map[center[0], center[1]] and self.check_within_bnds(center):  # ensure the center is within the island
+                break
+            min_dist_rank = min_dist_rank[1:]
+
+        if center is None:
+            return None
+
+        if np.linalg.norm(center - cur_point[:2]) < 1e-3:
+            # skip the frontier if it is too near to the agent
+            return None
+
 
         # allocate an id for the frontier
         assert np.all(self.frontier_map[region] == 0)
