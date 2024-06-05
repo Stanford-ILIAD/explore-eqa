@@ -67,8 +67,10 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_86_stuffed_animal_271786']
-        all_questions_in_scene = all_questions_in_scene[3:]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_70_shower_tub_101500']
+        # random.shuffle(all_questions_in_scene)
+        all_questions_in_scene = all_questions_in_scene[5:8]
+        # all_questions_in_scene.sort()
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
@@ -293,6 +295,8 @@ def main(cfg):
                                 os.system(f"cp {original_path} {target_path}")
                         else:
                             view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                            if np.linalg.norm(view_frontier_direction) < 1e-3:
+                                continue
                             default_view_direction = np.asarray([0., 0., -1.])
                             agent_state.rotation = quat_to_coeffs(
                                 quat_from_two_vectors(default_view_direction, view_frontier_direction)

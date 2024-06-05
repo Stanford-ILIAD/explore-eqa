@@ -65,6 +65,11 @@ class Frontier:
     visited: bool = False  # whether the frontier has been visited before
     image: str = None
 
+    def __eq__(self, other):
+        if not isinstance(other, Frontier):
+            raise TypeError("Cannot compare Frontier with non-Frontier object.")
+        return np.array_equal(self.region, other.region)
+
 
 @dataclass
 class Object:
@@ -641,109 +646,107 @@ class TSDFPlanner:
         # smoothen the map
         val_vol_2d = gaussian_filter(val_vol_2d, sigma=cfg.smooth_sigma)
 
-        # update all frontiers
-        all_frontier_areas = island & (unexplored_neighbors >= cfg.frontier_area_min) & (unexplored_neighbors <= cfg.frontier_area_max)
-        # remove the frontiers whose regions are changed
-        filtered_frontiers = []
-        for frontier in self.frontiers:
-            if np.all(all_frontier_areas[frontier.region]):  # the frontier region has not changed
-                filtered_frontiers.append(frontier)
-            else:
-                # remove the frontier
-                self.frontier_map[frontier.region] = 0  # free the region covered by the frontier
-        self.frontiers = filtered_frontiers
-
         # detect and update frontiers
         frontier_areas = np.argwhere(
             island
             & (unexplored_neighbors >= cfg.frontier_area_min)
             & (unexplored_neighbors <= cfg.frontier_area_max)
-            & (self.frontier_map == 0)  # not occupied by other frontiers
+        )
+        frontier_edge_areas = np.argwhere(
+            island
+            & (unexplored_neighbors >= cfg.frontier_edge_area_min)
+            & (unexplored_neighbors <= cfg.frontier_edge_area_max)
         )
 
-        if len(frontier_areas) == 0 and len(self.frontiers) == 0:
+        if len(frontier_areas) == 0:
             # this happens when there are stairs on the floor, and the planner cannot handle this situation
             # just skip this question
             return (None,)
 
-        if len(frontier_areas) > 0:
-            frontier_edge_areas = np.argwhere(
-                island
-                & (unexplored_neighbors >= cfg.frontier_edge_area_min)
-                & (unexplored_neighbors <= cfg.frontier_edge_area_max)
-                & (self.frontier_map == 0)  # not occupied by other frontiers
-            )
+        # cluster frontier regions
+        db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
+        labels = db.labels_
+        # get one point from each cluster
+        valid_ft_angles = []
+        for label in np.unique(labels):
+            if label == -1:
+                continue
+            cluster = frontier_areas[labels == label]
 
-            # cluster frontier regions
-            db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
-            labels = db.labels_
-            # get one point from each cluster
-            valid_ft_angles = []
-            for label in np.unique(labels):
-                if label == -1:
-                    continue
-                cluster = frontier_areas[labels == label]
+            # filter out small frontiers
+            area = len(cluster)
+            if area < cfg.min_frontier_area:
+                continue
 
-                # filter out small frontiers
-                area = len(cluster)
-                if area < cfg.min_frontier_area:
-                    continue
+            # convert the cluster from voxel coordinates to polar angle coordinates
+            angle_cluster = np.asarray([
+                np.arctan2(cluster[i, 1] - cur_point[1], cluster[i, 0] - cur_point[0])
+                for i in range(len(cluster))
+            ])  # range from -pi to pi
 
-                # convert the cluster from voxel coordinates to polar angle coordinates
-                angle_cluster = np.asarray([
-                    np.arctan2(cluster[i, 1] - cur_point[1], cluster[i, 0] - cur_point[0])
-                    for i in range(len(cluster))
-                ])  # range from -pi to pi
+            # get the range of the angles
+            angle_range = get_angle_span(angle_cluster)
+            warping_gap = get_warping_gap(angle_cluster)  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
+            if warping_gap is not None:
+                angle_cluster[angle_cluster < warping_gap] += 2 * np.pi
 
-                # get the range of the angles
-                angle_range = get_angle_span(angle_cluster)
-                warping_gap = get_warping_gap(angle_cluster)  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
-                if warping_gap is not None:
-                    angle_cluster[angle_cluster < warping_gap] += 2 * np.pi
-
-                if angle_range > cfg.max_frontier_angle_range_deg * np.pi / 180:
-                    # cluster again on the angle, ie, split the frontier
-                    num_clusters = int(angle_range / (cfg.max_frontier_angle_range_deg * np.pi / 180)) + 1
-                    db_angle = KMeans(n_clusters=num_clusters).fit(angle_cluster[..., None])
-                    labels_angle = db_angle.labels_
-                    for label_angle in np.unique(labels_angle):
-                        if label_angle == -1:
-                            continue
-                        ft_angle = np.mean(angle_cluster[labels_angle == label_angle])
-                        valid_ft_angles.append({
-                            'angle': ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle,
-                            'region': self.get_frontier_region_map(cluster[labels_angle == label_angle]),
-                        })
-                else:
-                    ft_angle = np.mean(angle_cluster)
+            if angle_range > cfg.max_frontier_angle_range_deg * np.pi / 180:
+                # cluster again on the angle, ie, split the frontier
+                num_clusters = int(angle_range / (cfg.max_frontier_angle_range_deg * np.pi / 180)) + 1
+                db_angle = KMeans(n_clusters=num_clusters).fit(angle_cluster[..., None])
+                labels_angle = db_angle.labels_
+                for label_angle in np.unique(labels_angle):
+                    if label_angle == -1:
+                        continue
+                    ft_angle = np.mean(angle_cluster[labels_angle == label_angle])
                     valid_ft_angles.append({
                         'angle': ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle,
-                        'region': self.get_frontier_region_map(cluster),
+                        'region': self.get_frontier_region_map(cluster[labels_angle == label_angle]),
                     })
+            else:
+                ft_angle = np.mean(angle_cluster)
+                valid_ft_angles.append({
+                    'angle': ft_angle - 2 * np.pi if ft_angle > np.pi else ft_angle,
+                    'region': self.get_frontier_region_map(cluster),
+                })
 
-            # merge angle clusters if they are too close
-            if len(valid_ft_angles) > 1:
-                valid_ft_angles_new = []
-                # sort the angles
-                valid_ft_angles = sorted(valid_ft_angles, key=lambda x: x['angle'])
-                while len(valid_ft_angles) > 0:
-                    cur_angle = valid_ft_angles.pop(0)
-                    if len(valid_ft_angles) > 0:
-                        next_angle = valid_ft_angles[0]
-                        if next_angle['angle'] - cur_angle['angle'] < cfg.min_frontier_angle_diff_deg * np.pi / 180:
-                            # merge the two
-                            weight = np.sum(cur_angle['region']) / (np.sum(cur_angle['region']) + np.sum(next_angle['region']))
-                            cur_angle['angle'] = cur_angle['angle'] * weight + next_angle['angle'] * (1 - weight)
-                            cur_angle['region'] = cur_angle['region'] | next_angle['region']
-                            valid_ft_angles.pop(0)
-                    valid_ft_angles_new.append(cur_angle)
-                valid_ft_angles = valid_ft_angles_new
+        # merge angle clusters if they are too close
+        if len(valid_ft_angles) > 1:
+            valid_ft_angles_new = []
+            # sort the angles
+            valid_ft_angles = sorted(valid_ft_angles, key=lambda x: x['angle'])
+            while len(valid_ft_angles) > 0:
+                cur_angle = valid_ft_angles.pop(0)
+                if len(valid_ft_angles) > 0:
+                    next_angle = valid_ft_angles[0]
+                    if next_angle['angle'] - cur_angle['angle'] < cfg.min_frontier_angle_diff_deg * np.pi / 180:
+                        # merge the two
+                        weight = np.sum(cur_angle['region']) / (np.sum(cur_angle['region']) + np.sum(next_angle['region']))
+                        cur_angle['angle'] = cur_angle['angle'] * weight + next_angle['angle'] * (1 - weight)
+                        cur_angle['region'] = cur_angle['region'] | next_angle['region']
+                        valid_ft_angles.pop(0)
+                valid_ft_angles_new.append(cur_angle)
+            valid_ft_angles = valid_ft_angles_new
 
-            # for each valid angle, create a frontier
-            for ft_data in valid_ft_angles:
-                self.frontiers.append(
-                    self.create_frontier(ft_data, island_map=island, cur_point=cur_point)
-                )
+        # for each valid angle, create a frontier
+        frontier_list = []
+        for ft_data in valid_ft_angles:
+            frontier_list.append(
+                self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
+            )
+
+        # remove frontiers that have been changed
+        filtered_frontiers = []
+        for frontier in self.frontiers:
+            if any(frontier == new_ft for new_ft in frontier_list):
+                filtered_frontiers.append(frontier)
+            else:
+                self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
+        self.frontiers = filtered_frontiers
+        # add new frontiers in this observation
+        for frontier in frontier_list:
+            if not any(frontier == prev_ft for prev_ft in self.frontiers):
+                self.frontiers.append(frontier)
 
         # subsample
         frontiers_weight = np.zeros((len(self.frontiers)))
@@ -1020,14 +1023,14 @@ class TSDFPlanner:
             ax2.set_title("Island")
 
             ax3.imshow(unexplored_neighbors + self.frontier_map)
-            frontiers_pre_cluster = np.argwhere(
-                island
-                & (unexplored_neighbors >= cfg.frontier_area_min)
-                & (unexplored_neighbors <= cfg.frontier_area_max)
-                & (self.frontier_map == 0)
-            )
-            for point in frontiers_pre_cluster:
-                ax3.scatter(point[1], point[0], color="white", s=10, alpha=1)
+            # frontiers_pre_cluster = np.argwhere(
+            #     island
+            #     & (unexplored_neighbors >= cfg.frontier_area_min)
+            #     & (unexplored_neighbors <= cfg.frontier_area_max)
+            #     & (self.frontier_map == 0)
+            # )
+            # for point in frontiers_pre_cluster:
+            #     ax3.scatter(point[1], point[0], color="white", s=10, alpha=1)
             for frontier in self.frontiers:
                 ax3.scatter(frontier.position[1], frontier.position[0], color="m", s=10, alpha=1)
                 normal = frontier.orientation
@@ -1308,7 +1311,7 @@ class TSDFPlanner:
             region_map[coord[0], coord[1]] = True
         return region_map
 
-    def create_frontier(self, ft_data: dict, island_map, cur_point) -> Frontier:
+    def create_frontier(self, ft_data: dict, frontier_edge_areas, cur_point) -> Frontier:
         ft_direction = np.array([np.cos(ft_data['angle']), np.sin(ft_data['angle'])])
         # frontier center is the point on the frontier_edge_area that has the nearest polar angle to ft_angle
         # center = frontier_edge_areas[
@@ -1322,33 +1325,40 @@ class TSDFPlanner:
         #         )
         #     )
         # ]
+
+        all_directions = frontier_edge_areas - cur_point[:2]
+        all_directions = all_directions / np.linalg.norm(all_directions, axis=1, keepdims=True)
+        center = frontier_edge_areas[
+            np.argmax(np.dot(all_directions, ft_direction))
+        ]
+
         region = ft_data['region']
-        ft_indices = np.argwhere(region)
-        # take the one that is the closest to mean as the center of the cluster
-        dist = np.sqrt(
-            (ft_indices[:, 0] - np.mean(ft_indices[:, 0])) ** 2
-            + (ft_indices[:, 1] - np.mean(ft_indices[:, 1])) ** 2
-        )
-        min_dist_rank = np.argsort(dist)
-        center = None
-        while True:
-            if len(min_dist_rank) == 0:
-                break
-            center = ft_indices[min_dist_rank[0]]
-            if island_map[center[0], center[1]] and self.check_within_bnds(center):  # ensure the center is within the island
-                break
-            min_dist_rank = min_dist_rank[1:]
-
-        if center is None:
-            return None
-
-        if np.linalg.norm(center - cur_point[:2]) < 1e-3:
-            # skip the frontier if it is too near to the agent
-            return None
+        # ft_indices = np.argwhere(region)
+        # # take the one that is the closest to mean as the center of the cluster
+        # dist = np.sqrt(
+        #     (ft_indices[:, 0] - np.mean(ft_indices[:, 0])) ** 2
+        #     + (ft_indices[:, 1] - np.mean(ft_indices[:, 1])) ** 2
+        # )
+        # min_dist_rank = np.argsort(dist)
+        # center = None
+        # while True:
+        #     if len(min_dist_rank) == 0:
+        #         break
+        #     center = ft_indices[min_dist_rank[0]]
+        #     if island_map[center[0], center[1]] and self.check_within_bnds(center):  # ensure the center is within the island
+        #         break
+        #     min_dist_rank = min_dist_rank[1:]
+        #
+        # if center is None:
+        #     return None
+        #
+        # if np.linalg.norm(center - cur_point[:2]) < 1e-3:
+        #     # skip the frontier if it is too near to the agent
+        #     return None
 
 
         # allocate an id for the frontier
-        assert np.all(self.frontier_map[region] == 0)
+        # assert np.all(self.frontier_map[region] == 0)
         frontier_id = self.frontier_counter
         self.frontier_map[region] = frontier_id
         self.frontier_counter += 1
