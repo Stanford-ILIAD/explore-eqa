@@ -46,7 +46,9 @@ from .geom import (
     get_nearest_true_point,
     get_proper_observe_point,
     get_angle_span,
-    get_warping_gap
+    get_warping_gap,
+    adjust_navigation_point,
+    region_equal
 )
 from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
@@ -171,7 +173,7 @@ class TSDFPlanner:
         self.frontiers: List[Frontier] = []
 
         # about frontiers
-        self.frontier_map = np.zeros(self._vol_dim[:2])
+        self.frontier_map = np.zeros(self._vol_dim[:2], dtype=int)
         self.frontier_counter = 1
 
     def increment_scene_graph(self, semantic_obs, obj_id_to_bbox, min_pix_ratio=0.0):
@@ -728,25 +730,42 @@ class TSDFPlanner:
                 valid_ft_angles_new.append(cur_angle)
             valid_ft_angles = valid_ft_angles_new
 
-        # for each valid angle, create a frontier
-        frontier_list = []
-        for ft_data in valid_ft_angles:
-            frontier_list.append(
-                self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
-            )
+        # # for each valid angle, create a frontier
+        # frontier_list = []
+        # for ft_data in valid_ft_angles:
+        #     frontier_list.append(
+        #         self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
+        #     )
+        #
+        # # remove frontiers that have been changed
+        # filtered_frontiers = []
+        # for frontier in self.frontiers:
+        #     if any(frontier == new_ft for new_ft in frontier_list):
+        #         filtered_frontiers.append(frontier)
+        #     else:
+        #         self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
+        # self.frontiers = filtered_frontiers
+        # # add new frontiers in this observation
+        # for frontier in frontier_list:
+        #     if not any(frontier == prev_ft for prev_ft in self.frontiers):
+        #         self.frontiers.append(frontier)
+        #     else:
+        #         self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
 
         # remove frontiers that have been changed
         filtered_frontiers = []
         for frontier in self.frontiers:
-            if any(frontier == new_ft for new_ft in frontier_list):
+            if any(region_equal(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
                 filtered_frontiers.append(frontier)
             else:
-                self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
+                self.free_frontier(frontier)
         self.frontiers = filtered_frontiers
-        # add new frontiers in this observation
-        for frontier in frontier_list:
-            if not any(frontier == prev_ft for prev_ft in self.frontiers):
-                self.frontiers.append(frontier)
+        # create new frontiers and add to frontier list
+        for ft_data in valid_ft_angles:
+            if not any(region_equal(prev_ft.region, ft_data['region']) for prev_ft in self.frontiers):
+                self.frontiers.append(
+                    self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
+                )
 
         # subsample
         frontiers_weight = np.zeros((len(self.frontiers)))
@@ -881,40 +900,6 @@ class TSDFPlanner:
                     # find the direction into unexplored
                     ft_direction = max_point.orientation
 
-                    # The following code add backtrack to the frontier
-                    # # Move back in the opposite direction of the normal by spacing, so the robot can see the frontier
-                    # # there is a chance that the point is outside the free space
-                    # next_point = np.array(max_point.position, dtype=float)
-                    # max_backtrack = int(frontier_spacing / self._voxel_size)
-                    # num_backtrack = 0
-                    # best_clearance_backtrack_point = None
-                    # best_clearance = 0
-                    # clearance = 0
-                    # # traverse all the backtrack points, and find the valid point with the largest clearance ahead
-                    # while num_backtrack < max_backtrack:
-                    #     next_point -= ft_direction
-                    #     num_backtrack += 1
-                    #
-                    #     # if the point is invalid
-                    #     if (occupied[int(next_point[0]), int(next_point[1])]
-                    #         or not island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
-                    #         or not self.check_within_bnds(next_point)  # out of bound of the map
-                    #     ):
-                    #         clearance = 0
-                    #         continue
-                    #     else:
-                    #         clearance += 1
-                    #         if clearance > best_clearance:
-                    #             best_clearance = clearance
-                    #             best_clearance_backtrack_point = next_point.copy()
-                    # if best_clearance_backtrack_point is None:
-                    #     # all points backward are invalid
-                    #     # so just skip this frontier
-                    #     logging.info("All points backward are invalid, skip this frontier!!!!!")
-                    #     continue
-
-                    # next_point = np.round(best_clearance_backtrack_point).astype(int)
-
                     # this try not backtrack
                     next_point = np.array(max_point.position, dtype=float)
                     while (
@@ -977,6 +962,9 @@ class TSDFPlanner:
                     next_point -= walk_dir * 0.3 / self._voxel_size
                 next_point = np.round(next_point).astype(int)
 
+        next_point_old = next_point.copy()
+        next_point = adjust_navigation_point(next_point, occupied, voxel_size=self._voxel_size, max_adjust_distance=0.4)
+
         # determine the direction: from next point to max point
         if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
             # this case should not happen actually, since the exploration should end before this
@@ -1004,6 +992,7 @@ class TSDFPlanner:
             ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
             ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
             ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+            ax1.scatter(next_point_old[1], next_point_old[0], c="y", s=30, label="old")
             # plot all the detected objects
             for obj_center in self.simple_scene_graph.values():
                 obj_vox = self.habitat2voxel(obj_center)
@@ -1013,7 +1002,8 @@ class TSDFPlanner:
                 ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
-            ax2.imshow(island)
+            island_high, _ = self.get_island_around_pts(pts, height=1.2)
+            ax2.imshow(island_high)
             for frontier in self.frontiers:
                 if frontier.image is not None:
                     ax2.scatter(frontier.position[1], frontier.position[0], color="g", s=50, alpha=1)
@@ -1050,6 +1040,7 @@ class TSDFPlanner:
             ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
             ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
             ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
+            ax4.scatter(next_point_old[1], next_point_old[0], c="y", s=30, label="old")
             ax4.quiver(
                 next_point[1],
                 next_point[0],
@@ -1328,9 +1319,18 @@ class TSDFPlanner:
 
         all_directions = frontier_edge_areas - cur_point[:2]
         all_directions = all_directions / np.linalg.norm(all_directions, axis=1, keepdims=True)
-        center = frontier_edge_areas[
-            np.argmax(np.dot(all_directions, ft_direction))
+        cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
+        # the center is the farthest point in the closest three points
+        center_candidates = np.asarray(
+            [frontier_edge_areas[cos_sim_rank[i]] for i in range(3)]
+        )
+        center = center_candidates[
+            np.argmax(np.linalg.norm(center_candidates - cur_point[:2], axis=1))
         ]
+
+        # center = frontier_edge_areas[
+        #     np.argmax(np.dot(all_directions, ft_direction))
+        # ]
 
         region = ft_data['region']
         # ft_indices = np.argwhere(region)
@@ -1369,6 +1369,9 @@ class TSDFPlanner:
             region=region,
             frontier_id=frontier_id
         )
+
+    def free_frontier(self, frontier: Frontier):
+        self.frontier_map[self.frontier_map == frontier.frontier_id] = 0
 
 
 

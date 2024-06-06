@@ -405,10 +405,86 @@ def get_angle_span(angles):
     return 2 * np.pi - max_gap
 
 
+def adjust_navigation_point(pos, occupied, max_dist=0.5, max_adjust_distance=0.3, step_size=0.05, voxel_size=0.1):
+    # adjust pos a bit to make it not too close to the occupied area, avoiding bad observations
+    max_dist = max_dist / voxel_size
+    max_adjust_distance = max_adjust_distance / voxel_size
+    step_size = step_size / voxel_size
+    pos = pos.astype(int)
+
+    if occupied[pos[0], pos[1]] == 1:
+        # if the current position is occupied, we need to first find a nearby unoccupied position
+        pos = get_nearest_true_point(pos, np.logical_not(occupied))
+
+    # find the nearest occupied point
+    occupied_point = get_nearest_true_point(pos, occupied)
+    direction = occupied_point - pos
+    original_dist = np.linalg.norm(direction)
+    direction = direction / original_dist
+
+    if original_dist > max_dist:
+        # if the point is far from the occupied point, we don't need to adjust it
+        return pos
+
+    # adjust the point
+    min_dist = original_dist
+    new_pos = pos
+    max_try = 100
+    count = 0
+    while count < max_try:
+        count += 1
+        new_pos = new_pos - direction * step_size
+        new_pos_int = np.round(new_pos).astype(int)
+        new_occupied_point = get_nearest_true_point(new_pos_int, occupied)
+        new_dist = np.linalg.norm(new_occupied_point - new_pos_int)
+        if new_dist >= max_dist:
+            break
+        if np.linalg.norm(new_pos_int - pos) >= max_adjust_distance:
+            break
+        if new_dist >= min_dist:
+            min_dist = new_dist
+        else:
+            new_pos = new_pos + direction * step_size
+            new_pos_int = np.round(new_pos).astype(int)
+            break
+        # update direction
+        direction = new_occupied_point - new_pos_int
+        direction = direction / np.linalg.norm(direction)
+
+    return new_pos_int
 
 
+def check_distance(occupied_map, pos, direction, tolerance):
+    # occupied_map, pos, direction, and tolerance are all in voxel space
+    max_steps = tolerance
+    all_points = np.round(
+        np.linspace(pos, pos + direction * max_steps, max_steps + 1)
+    ).astype(int)
+    for point in all_points:
+        if occupied_map[point[0], point[1]]:
+            return False
+    return True
 
 
+def get_collision_distance(occupied_map, pos, direction, max_step=50):
+    # occupied_map, pos, and direction are all in voxel space
+    pos = pos[:2]
+    curr_pos = pos
+    count = 0
+    while count < max_step:
+        count += 1
+        curr_pos = curr_pos + direction
+        if occupied_map[int(curr_pos[0]), int(curr_pos[1])]:
+            break
+    curr_pos = curr_pos.astype(int)
+    return np.linalg.norm(curr_pos - pos)
+
+
+def region_equal(region_1, region_2, threshold=3):
+    # region 1, 2: boolean array of the same shape
+    # threshold: the number of different points
+    diff = np.sum(region_1) - np.sum(region_1 & region_2)
+    return diff <= threshold
 
 
 

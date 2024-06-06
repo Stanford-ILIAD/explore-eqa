@@ -31,7 +31,7 @@ from src.habitat import (
     get_quaternion,
     get_navigable_point_to
 )
-from src.geom import get_cam_intr, get_scene_bnds
+from src.geom import get_cam_intr, get_scene_bnds, check_distance, get_collision_distance
 from src.vlm import VLM
 from src.tsdf_tempt import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
@@ -44,6 +44,12 @@ tricky case list:
 00657-TSJmdttd2GV_505_newspaper_733906
 00657-TSJmdttd2GV_424_chess_3677
 '''
+
+def get_info(pathfinder, pos):
+    is_navigable = pathfinder.is_navigable(pos)
+    hit_record = pathfinder.closest_obstacle_surface_point(pos, 0.5)
+    dist = hit_record.hit_dist
+    return is_navigable, dist
 
 
 def main(cfg):
@@ -67,9 +73,9 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_70_shower_tub_101500']
-        # random.shuffle(all_questions_in_scene)
-        all_questions_in_scene = all_questions_in_scene[5:8]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_165_printer_987655']
+        random.shuffle(all_questions_in_scene)
+        all_questions_in_scene = all_questions_in_scene[:3]
         # all_questions_in_scene.sort()
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
@@ -194,9 +200,24 @@ def main(cfg):
                 main_angle = all_angles.pop(total_views // 2)
                 all_angles.append(main_angle)
 
+                unoccupied_map, _ = tsdf_planner.get_island_around_pts(
+                    pts_normal, height=1.2
+                )
+                occupied_map = np.logical_not(unoccupied_map)
+
                 # observe and update the TSDF
                 for view_idx, ang in enumerate(all_angles):
                     logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+
+                    # check whether current view is valid
+                    collision_dist = tsdf_planner._voxel_size * get_collision_distance(
+                        occupied_map,
+                        pos=tsdf_planner.habitat2voxel(pts),
+                        direction=tsdf_planner.rad2vector(ang)
+                    )
+                    if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
+                        logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                        continue
 
                     agent_state.position = pts
                     agent_state.rotation = get_quaternion(ang, camera_tilt)
@@ -220,10 +241,16 @@ def main(cfg):
                     semantic_obs = obs["semantic_sensor"]
 
                     # check whether the observation is valid
+                    keep_observation = True
                     black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
                     if black_pix_ratio > cfg.black_pixel_ratio:
-                        logging.info(f"Black pixel ratio {black_pix_ratio} is too high, skip this view")
-                        continue
+                        keep_observation = f'black_pixel_ratio_{black_pix_ratio}'
+                    mean_depth = np.mean(depth[depth > 0])
+                    if mean_depth < cfg.min_avg_depth:
+                        keep_observation = f'min_avg_depth_{mean_depth}'
+                    if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
+                        keep_observation = f'min_30_percentile_depth_{np.percentile(depth[depth > 0], 30)}'
+                    keep_observation = f'{black_pix_ratio:.2f}_{mean_depth:.2f}_{np.percentile(depth[depth > 0], 30):.2f}_{np.percentile(depth[depth > 0], 50):.2f}_{collision_dist:.3f}'
 
                     # check stop condition
                     target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
@@ -237,7 +264,7 @@ def main(cfg):
                             target_found = True
 
                     # construct an frequency count map of each semantic id to a unique id
-                    masked_ids = np.unique(semantic_obs[depth > 5.0])
+                    masked_ids = np.unique(semantic_obs[depth > 3.0])
                     semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
                     tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
 
@@ -256,7 +283,7 @@ def main(cfg):
                         if target_found:
                             plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), rgb)
                         else:
-                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), rgb)
+                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-{keep_observation}.png"), rgb)
                         semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
                         semantic_img.putpalette(d3_40_colors_rgb.flatten())
                         semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
