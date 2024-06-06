@@ -37,7 +37,7 @@ pts_3 = np.asarray([-6., 0, 4.5])
 angle_4 = -45.0 / 180.0 * np.pi
 pts_4 = np.asarray([-11., 0, 0.])
 
-scene_path = '/gpfs/u/home/LMCG/LMCGnngn/scratch/yuncong/data/00813-svBbv1Pavdk'
+scene_path = '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/00100-y3K5dmhuukt/'
 save_dir = 'clip_experiments'
 text = 'Where is the red pillow?'
 os.makedirs(save_dir, exist_ok=True)
