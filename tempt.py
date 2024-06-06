@@ -1,9 +1,9 @@
 import os, pickle, random, shutil, logging, torch
 
-os.environ["HABITAT_SIM_LOG"] = (
-    "quiet"  # https://aihabitat.org/docs/habitat-sim/logging.html
-)
-os.environ["MAGNUM_LOG"] = "quiet"
+# os.environ["HABITAT_SIM_LOG"] = (
+#     "quiet"  # https://aihabitat.org/docs/habitat-sim/logging.html
+# )
+# os.environ["MAGNUM_LOG"] = "quiet"
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
