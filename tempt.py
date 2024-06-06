@@ -14,7 +14,6 @@ from src.habitat import (
     make_simple_cfg,
     pos_habitat_to_normal,
 )
-from transformers import CLIPProcessor, CLIPModel
 
 def get_similarity(img_feature, text_feature):
     img_feature = img_feature / img_feature.norm()
