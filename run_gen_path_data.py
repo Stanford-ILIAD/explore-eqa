@@ -73,7 +73,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00109-GTV2Y73Sn5t_165_printer_987655']
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00366-fxbzYAGkrtm_13_desk_chair_179443']
         random.shuffle(all_questions_in_scene)
         all_questions_in_scene = all_questions_in_scene[:3]
         # all_questions_in_scene.sort()
@@ -325,10 +325,18 @@ def main(cfg):
                             if np.linalg.norm(view_frontier_direction) < 1e-3:
                                 continue
                             default_view_direction = np.asarray([0., 0., -1.])
-                            agent_state.rotation = quat_to_coeffs(
-                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
+                            if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                                # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                                # we need to specify rotating along y-axis
+                                agent_state.rotation = quat_to_coeffs(
+                                    quaternion.quaternion(0, 0, 1, 0)
+                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                                ).tolist()
+                            else:
+                                agent_state.rotation = quat_to_coeffs(
+                                    quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                                ).tolist()
                             agent.set_state(agent_state)
                             # Get observation at current pose - skip black image, meaning robot is outside the floor
                             obs = simulator.get_sensor_observations()

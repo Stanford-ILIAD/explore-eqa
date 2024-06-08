@@ -480,12 +480,22 @@ def get_collision_distance(occupied_map, pos, direction, max_step=50):
     return np.linalg.norm(curr_pos - pos)
 
 
-def region_equal(region_1, region_2, threshold=3):
+def region_equal(region_1, region_2, threshold=0.99):
     # region 1, 2: boolean array of the same shape
     # threshold: the number of different points
-    diff = np.sum(region_1) - np.sum(region_1 & region_2)
-    return diff <= threshold
+    # tolenrance_1 = max(min_threshold, np.sum(region_1) // 100)
+    # diff_1 = np.sum(region_1) - np.sum(region_1 & region_2)
+    # tolerance_2 = max(min_threshold, np.sum(region_2) // 100)
+    # diff_2 = np.sum(region_2) - np.sum(region_1 & region_2)
+    # return tolenrance_1 < diff_1 and tolerance_2 < diff_2
+    return IoU(region_1, region_2) > threshold
 
+
+def IoU(region_1, region_2):
+    # region 1, 2: boolean array of the same shape
+    intersection = np.sum(region_1 & region_2)
+    union = np.sum(region_1 | region_2)
+    return intersection / union
 
 
 

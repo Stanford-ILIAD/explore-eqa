@@ -1,5 +1,5 @@
 # General
-seed: 22
+seed: 55
 exp_name: vlm_exp_frontiers
 output_parent_dir: results
 question_data_path: "generated_questions"
@@ -75,7 +75,7 @@ planner:
   frontier_area_max: 9
   min_frontier_area: 12  # the frontier should have at least this many pixels
   max_frontier_angle_range_deg: 90  # the angle spanned by the pixels in a frontier should not be larger than this
-  min_frontier_angle_diff_deg: 15  # the angle between two frontiers should be larger than this. otherwise, merge them
+  min_frontier_angle_diff_deg: 30  # the angle between two frontiers should be larger than this. otherwise, merge them
 
 visual_prompt:
   cluster_threshold: 1.0

@@ -36,20 +36,7 @@ import scipy.ndimage as ndimage
 from skimage import measure
 from sklearn.cluster import DBSCAN, KMeans
 from scipy.ndimage import gaussian_filter
-from .geom import (
-    points_in_circle,
-    find_normal,
-    close_operation,
-    rigid_transform,
-    run_dijkstra,
-    fps,
-    get_nearest_true_point,
-    get_proper_observe_point,
-    get_angle_span,
-    get_warping_gap,
-    adjust_navigation_point,
-    region_equal
-)
+from .geom import *
 from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
 from typing import List, Tuple, Optional, Dict
@@ -665,6 +652,10 @@ class TSDFPlanner:
             # just skip this question
             return (None,)
 
+        occupied_map_camera = np.logical_not(
+            self.get_island_around_pts(pts, height=1.2)[0]
+        )
+
         # cluster frontier regions
         db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
         labels = db.labels_
@@ -712,7 +703,38 @@ class TSDFPlanner:
                     'region': self.get_frontier_region_map(cluster),
                 })
 
-        # merge angle clusters if they are too close
+        # remove frontiers that have been changed
+        filtered_frontiers = []
+        for frontier in self.frontiers:
+            if any(region_equal(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
+                # the frontier is not changed at all
+                filtered_frontiers.append(frontier)
+                # then remove that new frontier
+                ft_idx = np.argmax([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+                valid_ft_angles.pop(ft_idx)
+            else:
+                self.free_frontier(frontier)
+                if any(0.8 < IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
+                    # the frontier is slightly updated
+                    # choose the new frontier that updates the current frontier
+                    update_ft_idx = np.argmax([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+                    ang = valid_ft_angles[update_ft_idx]['angle']
+                    # if the new frontier has no valid observations
+                    if 1 > self._voxel_size * get_collision_distance(
+                        occupied_map=occupied_map_camera,
+                        pos=cur_point,
+                        direction=np.array([np.cos(ang), np.sin(ang)])
+                    ):
+                        # create a new frontier with the old image
+                        old_img_path = frontier.image
+                        filtered_frontiers.append(
+                            self.create_frontier(valid_ft_angles[update_ft_idx], frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
+                        )
+                        filtered_frontiers[-1].image = old_img_path
+                        valid_ft_angles.pop(update_ft_idx)
+        self.frontiers = filtered_frontiers
+
+        # merge new frontiers if they are too close
         if len(valid_ft_angles) > 1:
             valid_ft_angles_new = []
             # sort the angles
@@ -730,36 +752,6 @@ class TSDFPlanner:
                 valid_ft_angles_new.append(cur_angle)
             valid_ft_angles = valid_ft_angles_new
 
-        # # for each valid angle, create a frontier
-        # frontier_list = []
-        # for ft_data in valid_ft_angles:
-        #     frontier_list.append(
-        #         self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
-        #     )
-        #
-        # # remove frontiers that have been changed
-        # filtered_frontiers = []
-        # for frontier in self.frontiers:
-        #     if any(frontier == new_ft for new_ft in frontier_list):
-        #         filtered_frontiers.append(frontier)
-        #     else:
-        #         self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
-        # self.frontiers = filtered_frontiers
-        # # add new frontiers in this observation
-        # for frontier in frontier_list:
-        #     if not any(frontier == prev_ft for prev_ft in self.frontiers):
-        #         self.frontiers.append(frontier)
-        #     else:
-        #         self.frontier_map[self.frontier_map == frontier.frontier_id] = 0  # free the region covered by the frontier
-
-        # remove frontiers that have been changed
-        filtered_frontiers = []
-        for frontier in self.frontiers:
-            if any(region_equal(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
-                filtered_frontiers.append(frontier)
-            else:
-                self.free_frontier(frontier)
-        self.frontiers = filtered_frontiers
         # create new frontiers and add to frontier list
         for ft_data in valid_ft_angles:
             if not any(region_equal(prev_ft.region, ft_data['region']) for prev_ft in self.frontiers):
@@ -963,7 +955,7 @@ class TSDFPlanner:
                 next_point = np.round(next_point).astype(int)
 
         next_point_old = next_point.copy()
-        next_point = adjust_navigation_point(next_point, occupied, voxel_size=self._voxel_size, max_adjust_distance=0.4)
+        next_point = adjust_navigation_point(next_point, occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
         # determine the direction: from next point to max point
         if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
@@ -1322,7 +1314,7 @@ class TSDFPlanner:
         cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
         # the center is the farthest point in the closest three points
         center_candidates = np.asarray(
-            [frontier_edge_areas[cos_sim_rank[i]] for i in range(3)]
+            [frontier_edge_areas[idx] for idx in cos_sim_rank[:6]]
         )
         center = center_candidates[
             np.argmax(np.linalg.norm(center_candidates - cur_point[:2], axis=1))

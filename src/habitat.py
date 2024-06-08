@@ -1,4 +1,5 @@
 import numpy as np
+import quaternion
 import habitat_sim
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 
@@ -217,6 +218,13 @@ def rgba2rgb(rgba, background=(1, 1, 1)):
 
 
 def get_quaternion(angle, camera_tilt):
+    normalized_angle = angle % (2 * np.pi)
+    if np.abs(normalized_angle - np.pi) < 1e-6:
+        return quat_to_coeffs(
+            quaternion.quaternion(0, 0, 1, 0) *
+            quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+        ).tolist()
+
     return quat_to_coeffs(
         quat_from_angle_axis(angle, np.array([0, 1, 0])) *
         quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
