@@ -16,6 +16,9 @@ import quaternion
 from openai import AzureOpenAI
 from PIL import Image
 
+import sys
+sys.path.append('..')
+
 from src.utils import *
 from script.background_prompts import background_prompts
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors
