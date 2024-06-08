@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 import os
 import pickle
 import json
@@ -12,12 +15,8 @@ os.environ["MAGNUM_LOG"] = "quiet"
 import numpy as np
 import quaternion
 
-
 from openai import AzureOpenAI
 from PIL import Image
-
-import sys
-sys.path.append('..')
 
 from src.utils import *
 from script.background_prompts import background_prompts
