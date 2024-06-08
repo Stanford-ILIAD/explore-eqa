@@ -1,6 +1,3 @@
-import sys
-sys.path.append('..')
-
 import os
 import pickle
 import json
@@ -17,6 +14,15 @@ import quaternion
 
 from openai import AzureOpenAI
 from PIL import Image
+
+import sys
+from pathlib import Path
+# Get the directory of the current script
+current_dir = Path(__file__).parent
+# Get the parent directory
+parent_dir = current_dir.parent
+# Add the parent directory to sys.path
+sys.path.append(str(parent_dir))
 
 from src.utils import *
 from script.background_prompts import background_prompts
