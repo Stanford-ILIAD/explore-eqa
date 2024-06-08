@@ -23,7 +23,12 @@ from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_
 
 def main(cfg):
     # scene_list = ['00800-TEEsavR23oF']
-    scene_list = ['00657-TSJmdttd2GV', '00366-fxbzYAGkrtm', '00109-GTV2Y73Sn5t']
+    available_scene_dir = '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/scene_feature_dict'
+    scene_list = os.listdir(available_scene_dir)
+    scene_list = [scene_name for scene_name in scene_list if os.path.isdir(os.path.join(available_scene_dir, scene_name))]
+
+
+
     question_categories = ['object_recognition', 'object_state_recognition', 'attribute_recognition',
                            'functional_reasoning', 'object_localization', 'spatial_understanding']
     sys_prompt = "You are a helpful assistant."
