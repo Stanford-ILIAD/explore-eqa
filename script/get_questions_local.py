@@ -137,7 +137,10 @@ def main(cfg):
         # Load the navigable maps
         pathfinder = simulator.pathfinder
         # pathfinder.seed(seed)
-        pathfinder.load_nav_mesh(navmesh_file)
+        load_success = pathfinder.load_nav_mesh(navmesh_file)
+        if not load_success:
+            logging.info(f"Failed to load the navmesh for {scene_name}")
+            continue
         agent = simulator.initialize_agent(sim_settings["default_agent"])
         agent_state = habitat_sim.AgentState()
 

@@ -1,12 +1,13 @@
 import os
 
-# os.environ["HABITAT_SIM_LOG"] = (
-#     "quiet"  # https://aihabitat.org/docs/habitat-sim/logging.html
-# )
-# os.environ["MAGNUM_LOG"] = "quiet"
-import numpy as np
+os.environ["HABITAT_SIM_LOG"] = (
+    "quiet"  # https://aihabitat.org/docs/habitat-sim/logging.html
+)
+os.environ["MAGNUM_LOG"] = "quiet"
+
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
+import numpy as np
 
 import habitat_sim
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis
@@ -15,31 +16,7 @@ from src.habitat import (
     pos_habitat_to_normal,
 )
 
-def get_similarity(img_feature, text_feature):
-    img_feature = img_feature / img_feature.norm()
-    text_feature = text_feature / text_feature.norm()
-    return (img_feature @ text_feature.T).item()
-
-# view 1
-pts_1 = np.asarray([0., 0, 0.])
-angle_1 = 60.0 / 180.0 * np.pi
-
-# view 2
-pts_2 = np.asarray([-3.5, 0, -0.5])
-angle_2 = -75.0 / 180.0 * np.pi
-
-# view 3
-angle_3 = -30.0 / 180.0 * np.pi
-pts_3 = np.asarray([-6., 0, 4.5])
-
-# view 4
-angle_4 = -45.0 / 180.0 * np.pi
-pts_4 = np.asarray([-11., 0, 0.])
-
-scene_path = '../../../multisensory/MLLM/data/hm3d/00100-y3K5dmhuukt'
-save_dir = 'clip_experiments'
-text = 'Where is the red pillow?'
-os.makedirs(save_dir, exist_ok=True)
+all_dir = '../../../multisensory/MLLM/data/hm3d/train/'
 
 seed = 42
 camera_height = 1.2
@@ -56,92 +33,46 @@ cy = img_height // 2
 cam_intr = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
 min_avg_depth_initial = 1.0  # smaller than before
 
-# Load the scene
-scene_name = scene_path.split("/")[-1].split("-")[-1]
-scene_mesh_dir = os.path.join(scene_path, scene_name + '.basis' + '.glb')
-navmesh_file = os.path.join(scene_path, scene_name + '.basis' + '.navmesh')
-sim_settings = {
-    "scene": scene_mesh_dir,
-    "default_agent": 0,
-    "sensor_height": camera_height,
-    "width": img_width,
-    "height": img_height,
-    "hfov": hfov,
-}
-cfg = make_simple_cfg(sim_settings)
-simulator = habitat_sim.Simulator(cfg)
-pathfinder = simulator.pathfinder
-pathfinder.seed(seed)
-pathfinder.load_nav_mesh(navmesh_file)
-agent = simulator.initialize_agent(sim_settings["default_agent"])
-agent_state = habitat_sim.AgentState()
+all_scenes = os.listdir(all_dir)
+total_scene = len(all_scenes)
+success_count = 0
+failed_scenes = []
+for idx, scene_name in enumerate(all_scenes):
+    try:
+        simulator.close()
+    except:
+        pass
 
-rotation_1 = quat_to_coeffs(
-    quat_from_angle_axis(angle_1, np.array([0, 1, 0]))
-    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-).tolist()
-agent_state.position = pts_1
-agent_state.rotation = rotation_1
-agent.set_state(agent_state)
-obs = simulator.get_sensor_observations()
-rgb_1 = obs["color_sensor"]  # (H, W, 4), uint8
-# save image
-plt.imsave(os.path.join(save_dir, 'view_1.png'), rgb_1)
+    scene_path = os.path.join(all_dir, scene_name)
+    scene_name_short = scene_path.split("/")[-1].split("-")[-1]
+    scene_mesh_dir = os.path.join(scene_path, scene_name_short + '.basis' + '.glb')
+    navmesh_file = os.path.join(scene_path, scene_name_short + '.basis' + '.navmesh')
+    assert os.path.exists(scene_mesh_dir) and os.path.exists(navmesh_file), f"{scene_mesh_dir}_{navmesh_file}"
+    sim_settings = {
+        "scene": scene_mesh_dir,
+        "default_agent": 0,
+        "sensor_height": camera_height,
+        "width": img_width,
+        "height": img_height,
+        "hfov": hfov,
+    }
 
-rotation_2 = quat_to_coeffs(
-    quat_from_angle_axis(angle_2, np.array([0, 1, 0]))
-    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-).tolist()
-agent_state.position = pts_2
-agent_state.rotation = rotation_2
-agent.set_state(agent_state)
-obs = simulator.get_sensor_observations()
-rgb_2 = obs["color_sensor"]  # (H, W, 4), uint8
-# save image
-plt.imsave(os.path.join(save_dir, 'view_2.png'), rgb_2)
+    try:
+        cfg = make_simple_cfg(sim_settings)
+        simulator = habitat_sim.Simulator(cfg)
+        pathfinder = simulator.pathfinder
 
-rotation_3 = quat_to_coeffs(
-    quat_from_angle_axis(angle_3, np.array([0, 1, 0]))
-    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-).tolist()
-agent_state.position = pts_3
-agent_state.rotation = rotation_3
-agent.set_state(agent_state)
-obs = simulator.get_sensor_observations()
-rgb_3 = obs["color_sensor"]  # (H, W, 4), uint8
-# save image
-plt.imsave(os.path.join(save_dir, 'view_3.png'), rgb_3)
+        success = pathfinder.load_nav_mesh(navmesh_file)
 
-rotation_4 = quat_to_coeffs(
-    quat_from_angle_axis(angle_4, np.array([0, 1, 0]))
-    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-).tolist()
-agent_state.position = pts_4
-agent_state.rotation = rotation_4
-agent.set_state(agent_state)
-obs = simulator.get_sensor_observations()
-rgb_4 = obs["color_sensor"]  # (H, W, 4), uint8
-# save image
-plt.imsave(os.path.join(save_dir, 'view_4.png'), rgb_4)
+    except:
+        success = False
 
+    if not success:
+        print(f"{idx}/{total_scene}   Failed in loading navmesh: {scene_name}")
+        failed_scenes.append(scene_name)
+    else:
+        success_count += 1
+        print(f"{idx}/{total_scene}   Success: {scene_name}")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+print(f"Failed: {'   '.join(failed_scenes)}")
+print(f"Success: {success_count}/{total_scene}")
