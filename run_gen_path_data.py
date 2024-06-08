@@ -73,7 +73,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00366-fxbzYAGkrtm_13_desk_chair_179443']
+        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00657-TSJmdttd2GV_505_newspaper_733906']
         random.shuffle(all_questions_in_scene)
         all_questions_in_scene = all_questions_in_scene[:3]
         # all_questions_in_scene.sort()

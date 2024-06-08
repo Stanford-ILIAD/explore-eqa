@@ -480,7 +480,7 @@ def get_collision_distance(occupied_map, pos, direction, max_step=50):
     return np.linalg.norm(curr_pos - pos)
 
 
-def region_equal(region_1, region_2, threshold=0.99):
+def region_equal(region_1, region_2, threshold=0.98):
     # region 1, 2: boolean array of the same shape
     # threshold: the number of different points
     # tolenrance_1 = max(min_threshold, np.sum(region_1) // 100)

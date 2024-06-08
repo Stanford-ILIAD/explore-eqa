@@ -31,9 +31,9 @@ stop_max_bias_from_center: 0.3  # the target object should be within 60% of the 
 init_clearance: 0.3
 max_step_dist_ratio: 2.5
 min_random_init_steps: 2
-extra_view_phase_1: 7
-extra_view_angle_deg_phase_1: 45
-extra_view_phase_2: 7  # in phase 2, have more observations
+extra_view_phase_1: 6
+extra_view_angle_deg_phase_1: 40
+extra_view_phase_2: 8  # in phase 2, have more observations
 extra_view_angle_deg_phase_2: 45
 
 # Observation filtering
