@@ -33,7 +33,10 @@ cy = img_height // 2
 cam_intr = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
 min_avg_depth_initial = 1.0  # smaller than before
 
-all_scenes = os.listdir(all_dir)
+available_scene_dir = '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/scene_feature_dict'
+all_scenes = os.listdir(available_scene_dir)
+all_scenes = [scene_name for scene_name in all_scenes if os.path.isdir(os.path.join(available_scene_dir, scene_name))]
+
 total_scene = len(all_scenes)
 success_count = 0
 failed_scenes = []
