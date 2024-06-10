@@ -197,7 +197,7 @@ def main(cfg):
                 pts_pixs = np.empty((0, 2))
                 pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(start_position)[:2]))
 
-                logging.info(f'Question id {question_data["question_id"]}-path {path_idx} initialization successful!')
+                logging.info(f'\n\nQuestion id {question_data["question_id"]}-path {path_idx} initialization successful!')
 
                 metadata = {}
                 metadata["question"] = question_data["question"]
