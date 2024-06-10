@@ -339,7 +339,7 @@ def get_nearest_true_point(point, bool_map):
             return np.array([x + dx_vertical, y + dy_vertical])
 
 
-def get_proper_observe_point(point, unoccupied_map, dist=10):
+def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
     # Get a proper observation point at dist
     # the observation point should not near the wall, so it's a bit tricky
     # point, dist are all in voxel space
@@ -367,6 +367,13 @@ def get_proper_observe_point(point, unoccupied_map, dist=10):
     max_cluster_center = np.mean(max_cluster_coords, axis=0)
 
     direction = max_cluster_center - point
+
+    if np.linalg.norm(direction) < 1e-3:
+        # if the surrounding of the object point is totally navigable
+        direction = cur_point[:2] - point
+        if np.linalg.norm(direction) < 1e-3:
+            return None
+
     direction = direction / np.linalg.norm(direction)
     final_point = point + direction * dist
 

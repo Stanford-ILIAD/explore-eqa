@@ -843,7 +843,7 @@ class TSDFPlanner:
             # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
             # since it's not proper to directly go to the target point,
             # we'd better find a navigable point that is certain distance from it to better observe the target
-            target_navigable_point = get_proper_observe_point(target_point, unoccupied, dist=cfg.final_observe_distance / self._voxel_size)
+            target_navigable_point = get_proper_observe_point(target_point, unoccupied, cur_point=cur_point , dist=cfg.final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
                 return (None,)
