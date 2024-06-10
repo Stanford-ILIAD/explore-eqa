@@ -360,9 +360,9 @@ def main(cfg):
                             frontier_dict["rgb_id"] = frontier.image
                         else:
                             view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                            if np.linalg.norm(view_frontier_direction) < 1e-3:
-                                continue
                             default_view_direction = np.asarray([0., 0., -1.])
+                            if np.linalg.norm(view_frontier_direction) < 1e-3:
+                                view_frontier_direction = default_view_direction
                             if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
                                 # if the rotation is to rotate 180 degree, then the quaternion is not unique
                                 # we need to specify rotating along y-axis
