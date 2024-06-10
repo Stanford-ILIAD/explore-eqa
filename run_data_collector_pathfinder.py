@@ -397,8 +397,8 @@ def main(cfg):
                         prediction += [float(ft == max_point_choice) for ft in tsdf_planner.frontiers]
                     else:
                         raise ValueError("Invalid max_point_choice type")
-                    assert len(prediction) == len(step_dict["scene_graph"]) + len(step_dict["frontiers"])
-                    assert sum(prediction) == 1.0
+                    assert len(prediction) == len(step_dict["scene_graph"]) + len(step_dict["frontiers"]), f"{len(prediction)} != {len(step_dict['scene_graph'])} + {len(step_dict['frontiers'])}"
+                    assert sum(prediction) == 1.0, f"{sum(prediction)} != 1.0"
                     step_dict["prediction"] = prediction
 
                     # Save step data
@@ -446,7 +446,7 @@ def main(cfg):
                     if cfg.del_fail_case:
                         os.system(f"rm -r {episode_data_dir}")
 
-                logging.info(f"{question_ind + 1}/{total_questions}: Success rate: {success_count}/{question_ind}")
+                logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
 
             logging.info(f"Question id {question_data['question_id']} finished all paths")
 
