@@ -365,7 +365,7 @@ def main(cfg):
                     pts_normal, angle, pts_pix, fig, path_points, max_point_choice = return_values
 
                     # Turn to face each frontier point and get rgb image
-                    print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
+                    # print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
                     for i, frontier in enumerate(tsdf_planner.frontiers):
                         frontier_dict = {}
                         pos_voxel = frontier.position

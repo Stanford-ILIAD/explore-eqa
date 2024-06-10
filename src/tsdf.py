@@ -939,10 +939,10 @@ class TSDFPlanner:
 
             # choose the frontier with highest weight
             if len(self.frontiers) > 0:
-                logging.info(
-                    f"Mean and std of frontier weight: {np.mean(frontiers_weight):.3f},"
-                    f" {np.std(frontiers_weight):.3f}"
-                )
+                # logging.info(
+                #     f"Mean and std of frontier weight: {np.mean(frontiers_weight):.3f},"
+                #     f" {np.std(frontiers_weight):.3f}"
+                # )
                 point_type = "frontier"
 
                 # take best point until it satisfies condition
