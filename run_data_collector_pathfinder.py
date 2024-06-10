@@ -66,6 +66,7 @@ def main(cfg):
     # for each scene, answer each question
     question_ind = 0
     success_count = 0
+    total_questions = len(questions_data) * cfg.paths_per_question
     for scene_id in all_scene_list:
         all_questions_in_scene = [q for q in questions_data if q["episode_history"] == scene_id]
 
@@ -445,7 +446,7 @@ def main(cfg):
                     if cfg.del_fail_case:
                         os.system(f"rm -r {episode_data_dir}")
 
-                logging.info(f"Success rate: {success_count}/{question_ind} = {success_count / question_ind:.2f}")
+                logging.info(f"{question_ind + 1}/{total_questions}: Success rate: {success_count}/{question_ind}")
 
             logging.info(f"Question id {question_data['question_id']} finished all paths")
 
