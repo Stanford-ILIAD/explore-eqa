@@ -3,6 +3,7 @@ import random
 import scipy.ndimage as ndimage
 import heapq
 import math
+import logging
 from src.habitat import pos_habitat_to_normal
 from sklearn.cluster import DBSCAN
 
@@ -297,6 +298,7 @@ def get_nearest_true_point(point, bool_map):
     x, y = point
     x, y = int(x), int(y)
     if x < 0 or x >= H or y < 0 or y >= W:
+        logging.error(f"Error in get_nearest_true_point: point {point} is out of the map of shape {bool_map.shape}")
         return None
     if bool_map[x, y]:
         return point
@@ -327,6 +329,7 @@ def get_nearest_true_point(point, bool_map):
     dx_vertical, dy_vertical = dx, dy
 
     if not horizontal_found and not vertical_found:
+        logging.error(f"Error in get_nearest_true_point: no true point found in the map of shape {bool_map.shape}")
         return None
     elif not horizontal_found:
         return np.array([x + dx_vertical, y + dy_vertical])
@@ -349,6 +352,7 @@ def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
 
     # cluster the points
     if len(valid_coords) == 0:
+        logging.error(f"Error in get_proper_observe_point: no unoccupied points for {dist} distance around point {point}")
         return None
     clustering = DBSCAN(eps=1, min_samples=1).fit(valid_coords)
     labels = clustering.labels_
@@ -362,6 +366,7 @@ def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
             max_cluster_size = cluster_size
             max_cluster_id = cluster_id
     if max_cluster_id == -1:
+        logging.error(f"Error in get_proper_observe_point: clustering failed for {dist} distance around point {point}")
         return None
     max_cluster_coords = valid_coords[labels == max_cluster_id]
     max_cluster_center = np.mean(max_cluster_coords, axis=0)
@@ -372,6 +377,7 @@ def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
         # if the surrounding of the object point is totally navigable
         direction = cur_point[:2] - point
         if np.linalg.norm(direction) < 1e-3:
+            logging.error(f"Error in get_proper_observe_point: {max_cluster_center}, {point}, {cur_point}")
             return None
 
     direction = direction / np.linalg.norm(direction)

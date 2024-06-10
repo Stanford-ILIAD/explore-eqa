@@ -724,6 +724,7 @@ class TSDFPlanner:
         if len(frontier_areas) == 0:
             # this happens when there are stairs on the floor, and the planner cannot handle this situation
             # just skip this question
+            logging.error(f'Error in find_next_pose_with_path: frontier area size is 0')
             return (None,)
 
         occupied_map_camera = np.logical_not(
@@ -846,6 +847,7 @@ class TSDFPlanner:
             target_navigable_point = get_proper_observe_point(target_point, unoccupied, cur_point=cur_point , dist=cfg.final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
+                logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
                 return (None,)
             self.target_point = target_navigable_point
             self.max_point = Object(target_point.astype(int), target_obj_id)
