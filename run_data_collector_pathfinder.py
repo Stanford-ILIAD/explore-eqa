@@ -73,8 +73,8 @@ def main(cfg):
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
         # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
-        random.shuffle(all_questions_in_scene)
-        all_questions_in_scene = all_questions_in_scene[:2]
+        # random.shuffle(all_questions_in_scene)
+        # all_questions_in_scene = all_questions_in_scene[:2]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
