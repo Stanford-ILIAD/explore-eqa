@@ -76,24 +76,24 @@ def test_object_detection(model, rgb, semantic_obs, target_obj_id, obj_id_to_nam
 
 def main(cfg):
     # scene_list = ['00800-TEEsavR23oF']
-    scene_files = 'files.txt'
+    scene_files = 'all_scenes.txt'
     scene_list = []
     with open(scene_files, "r") as f:
         for line in f.readlines():
             scene_list.append(line.strip())
     # scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) > 203]
-    
-    generated_results_folder = 'generated_questions'
-    generated_lists = os.listdir(generated_results_folder)
-    generated_lists = [img for img in generated_lists if img.endswith('.png')]
-    generated_lists = [int(f.split('-')[0]) for f in generated_lists]
-    generated_lists = list(set(generated_lists))
-    generated_lists = [idx for idx in generated_lists if idx != 324 and idx != 366 and idx != 657 and idx != 669]
-    scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) != 324 and int(scene_name.split('-')[0]) != 366 and int(scene_name.split('-')[0]) != 657 and int(scene_name.split('-')[0]) != 669]
-    scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) > max(generated_lists)]
-    scene_list.sort()
 
+    # load generated questions save file
+    generated_questions_save_file = os.path.join(cfg.save_dir, f"generated_questions.json")
+    if os.path.exists(generated_questions_save_file):
+        generated_question_list = json.load(open(generated_questions_save_file, "r"))
+        logging.info(f'Loaded {len(generated_question_list)} previously generated questions')
+    else:
+        generated_question_list = []
 
+    scene_covered = [item['episode_history'] for item in generated_question_list]
+    scene_covered = list(set(scene_covered))
+    scene_list = [scene_name for scene_name in scene_list if scene_name not in scene_covered]
 
     question_categories = ['object_recognition', 'object_state_recognition', 'attribute_recognition',
                            'functional_reasoning', 'object_localization', 'spatial_understanding']
@@ -123,7 +123,7 @@ def main(cfg):
             scene_path_list.append(os.path.join(cfg.dataset_path, 'val', scene_name))
 
 
-    detection_model = YOLOWorld(model_id="yolo_world/s")
+    detection_model = YOLOWorld(model_id="yolo_world/x")  # "yolo_world/s" is smaller, but yolo_world/x is also fast and not big
 
     # traverse each scene
     for scene_path in scene_path_list:
@@ -134,9 +134,9 @@ def main(cfg):
         scene_semantic_texture_file = os.path.join(scene_path, scene_name + ".semantic" + ".glb")
         scene_semantic_annotation_file = os.path.join(scene_path, scene_name + ".semantic" + ".txt")
 
-        if not os.path.exists(scene_mesh_dir) or not os.path.exists(navmesh_file) or not os.path.exists(scene_semantic_texture_file) or not os.path.exists(scene_semantic_annotation_file):
-            logging.info(f"Scene not found: {scene_name}")
-            continue
+        # if not os.path.exists(scene_mesh_dir) or not os.path.exists(navmesh_file) or not os.path.exists(scene_semantic_texture_file) or not os.path.exists(scene_semantic_annotation_file):
+        #     logging.info(f"Scene not found: {scene_name}")
+        #     continue
 
         assert os.path.exists(scene_mesh_dir) and os.path.exists(navmesh_file)
         assert os.path.exists(scene_semantic_texture_file) and os.path.exists(scene_semantic_annotation_file)
@@ -217,14 +217,6 @@ def main(cfg):
         # load bounding box data
         bounding_box_data = json.load(open(os.path.join(cfg.bounding_box_dir, scene_path.split("/")[-1] + ".json"), "r"))
         object_id_to_bbox = {int(item['id']): item['bbox'] for item in bounding_box_data}
-
-        # load generated questions save file
-        generated_questions_save_file = os.path.join(cfg.save_dir, f"generated_questions.json")
-        if os.path.exists(generated_questions_save_file):
-            generated_question_list = json.load(open(generated_questions_save_file, "r"))
-            logging.info(f'Loaded {len(generated_question_list)} previously generated questions')
-        else:
-            generated_question_list = []
 
         # for each object within the rare class, get several views
         for rare_class in rare_class_list:
