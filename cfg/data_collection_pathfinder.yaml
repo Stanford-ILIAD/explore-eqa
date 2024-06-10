@@ -27,6 +27,8 @@ save_visualization: true
 save_frontier_video: false
 del_fail_case: false
 
+paths_per_scene: 2
+
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
 stop_max_bias_from_center: 0.4  # the target object should be within 60% of the image center horizontally
