@@ -239,7 +239,7 @@ def main(cfg):
 
                     # observe and update the TSDF
                     for view_idx, ang in enumerate(all_angles):
-                        logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+                        # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
 
                         # check whether current view is valid
                         collision_dist = tsdf_planner._voxel_size * get_collision_distance(
@@ -248,7 +248,7 @@ def main(cfg):
                             direction=tsdf_planner.rad2vector(ang)
                         )
                         if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
-                            logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                            # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
                             continue
 
                         agent_state.position = pts
@@ -280,7 +280,7 @@ def main(cfg):
                         if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
                             keep_observation = False
                         if not keep_observation and view_idx != total_views - 1:
-                            logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                            # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
                             continue
 
                         # construct an frequency count map of each semantic id to a unique id
