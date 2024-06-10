@@ -32,8 +32,10 @@ from src.habitat import (
     get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, check_distance, get_collision_distance
-from src.tsdf_tempt import TSDFPlanner
+from src.tsdf import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
+from inference.models import YOLOWorld
+
 
 '''
 tricky case list:
@@ -59,6 +61,9 @@ def main(cfg):
 
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
+
+    # load object detection model
+    detection_model = YOLOWorld(model_id=cfg.detection_model_name)
 
     # Load dataset
     with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
@@ -88,7 +93,6 @@ def main(cfg):
         assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
 
         try:
-            del tsdf_planner.detection_model
             del tsdf_planner
         except:
             pass
@@ -166,7 +170,6 @@ def main(cfg):
             floor_height = target_position[1]
             tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
             try:
-                del tsdf_planner.detection_model
                 del tsdf_planner
             except:
                 pass
@@ -176,7 +179,6 @@ def main(cfg):
                 floor_height_offset=0,
                 pts_init=pos_habitat_to_normal(start_position),
                 init_clearance=cfg.init_clearance * 2,
-                detection_model_name=cfg.detection_model_name,
             )
 
             # convert path points to normal and drop y-axis for tsdf planner
@@ -253,13 +255,14 @@ def main(cfg):
                     if black_pix_ratio > cfg.black_pixel_ratio:
                         keep_observation = False
                     if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
-                        keep_observation = True
+                        keep_observation = False
                     if not keep_observation:
                         logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
                         continue
 
                     # construct an frequency count map of each semantic id to a unique id
                     target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
+                        detection_model=detection_model,
                         rgb=rgb[..., :3],
                         semantic_obs=semantic_obs,
                         obj_id_to_name=object_id_to_name,
@@ -275,12 +278,10 @@ def main(cfg):
                             target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
                             if target_obj_pix_ratio > 0:
                                 obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
-                                bias_from_center = (obj_pix_center - np.asarray(
-                                    [img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                                bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
                                 # currently just consider that the object should be in around the horizontal center, not the vertical center
                                 # due to the viewing angle difference
-                                if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[
-                                    1] < cfg.stop_max_bias_from_center:
+                                if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
                                     logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
                                     target_found = True
 

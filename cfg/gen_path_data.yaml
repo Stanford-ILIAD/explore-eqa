@@ -1,11 +1,12 @@
 # General
-seed: 55
+seed: 56
 exp_name: vlm_exp_frontiers
 output_parent_dir: results
 question_data_path: "generated_questions"
 scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d"
 semantic_bbox_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged"
+detection_model_name: "yolo_world/s"
 
 # Sample navigation point
 min_travel_dist: 5.0
@@ -24,12 +25,12 @@ save_obs: true
 save_frontier: true
 
 # Stop criteria
-stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
-stop_max_bias_from_center: 0.3  # the target object should be within 60% of the image center horizontally
+stop_min_pix_ratio: 0.005  # the target object should occupy at least 1% of the image
+stop_max_bias_from_center: 0.4  # the target object should be within 60% of the image center horizontally
 
 # Navigation
 init_clearance: 0.3
-max_step_dist_ratio: 2.5
+max_step_dist_ratio: 2
 min_random_init_steps: 2
 extra_view_phase_1: 6
 extra_view_angle_deg_phase_1: 40
@@ -38,7 +39,6 @@ extra_view_angle_deg_phase_2: 45
 
 # Observation filtering
 black_pixel_ratio: 0.2
-min_avg_depth: 0.5
 min_30_percentile_depth: 0.1
 collision_dist: 1
 
@@ -87,3 +87,8 @@ visual_prompt:
   cam_offset: 0.6
   min_num_prompt_points: 2
   circle_radius: 18
+
+scene_graph:
+  confidence: 0.003
+  nms_threshold: 0.1
+  iou_threshold: 0.5

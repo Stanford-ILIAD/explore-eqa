@@ -31,10 +31,18 @@ from src.habitat import (
     get_quaternion,
     get_navigable_point_to
 )
-from src.geom import get_cam_intr, get_scene_bnds
-from src.vlm import VLM
+from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf import TSDFPlanner, Frontier, Object
 from habitat_sim.utils.common import d3_40_colors_rgb
+from inference.models import YOLOWorld
+
+
+
+def get_info(pathfinder, pos):
+    is_navigable = pathfinder.is_navigable(pos)
+    hit_record = pathfinder.closest_obstacle_surface_point(pos, 0.5)
+    dist = hit_record.hit_dist
+    return is_navigable, dist
 
 
 def main(cfg):
@@ -45,6 +53,9 @@ def main(cfg):
 
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
+
+    # load object detection model
+    detection_model = YOLOWorld(model_id=cfg.detection_model_name)
 
     # Load dataset
     with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
@@ -61,7 +72,8 @@ def main(cfg):
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
         # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
-        # all_questions_in_scene = all_questions_in_scene[6:]
+        random.shuffle(all_questions_in_scene)
+        all_questions_in_scene = all_questions_in_scene[:10]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
@@ -73,6 +85,10 @@ def main(cfg):
         scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
         assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
 
+        try:
+            del tsdf_planner
+        except:
+            pass
         try:
             simulator.close()
         except:
@@ -99,6 +115,7 @@ def main(cfg):
         # load semantic object bbox data
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
+        object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
         #
         # # Load the semantic annotation
         # obj_id_to_class = {}
@@ -174,7 +191,7 @@ def main(cfg):
             pts_pixs = np.empty((0, 2))
             pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(start_position)[:2]))
 
-            logging.info(f'Question id {question_data["question_id"]} finish initialization')
+            logging.info(f'Question id {question_data["question_id"]} initialization successful!')
 
             metadata = {}
             metadata["question"] = question_data["question"]
@@ -209,9 +226,24 @@ def main(cfg):
                 main_angle = all_angles.pop(total_views // 2)
                 all_angles.append(main_angle)
 
+                unoccupied_map, _ = tsdf_planner.get_island_around_pts(
+                    pts_normal, height=1.2
+                )
+                occupied_map = np.logical_not(unoccupied_map)
+
                 # observe and update the TSDF
                 for view_idx, ang in enumerate(all_angles):
                     logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+
+                    # check whether current view is valid
+                    collision_dist = tsdf_planner._voxel_size * get_collision_distance(
+                        occupied_map,
+                        pos=tsdf_planner.habitat2voxel(pts),
+                        direction=tsdf_planner.rad2vector(ang)
+                    )
+                    if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
+                        logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                        continue
 
                     agent_state.position = pts
                     agent_state.rotation = get_quaternion(ang, camera_tilt)
@@ -235,26 +267,40 @@ def main(cfg):
                     semantic_obs = obs["semantic_sensor"]
 
                     # check whether the observation is valid
+                    keep_observation = True
                     black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
                     if black_pix_ratio > cfg.black_pixel_ratio:
-                        logging.info(f"Black pixel ratio {black_pix_ratio} is too high, skip this view")
+                        keep_observation = False
+                    if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
+                        keep_observation = False
+                    if not keep_observation and view_idx != total_views - 1:
+                        logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
                         continue
 
-                    # check stop condition
-                    target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
-                    if target_obj_pix_ratio > 0:
-                        obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
-                        bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
-                        # currently just consider that the object should be in around the horizontal center, not the vertical center
-                        # due to the viewing angle difference
-                        if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
-                            logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
-                            target_found = True
-
                     # construct an frequency count map of each semantic id to a unique id
-                    masked_ids = np.unique(semantic_obs[depth > 5.0])
-                    semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
-                    tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
+                    target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
+                        detection_model=detection_model,
+                        rgb=rgb[..., :3],
+                        semantic_obs=semantic_obs,
+                        obj_id_to_name=object_id_to_name,
+                        obj_id_to_bbox=object_id_to_bbox,
+                        cfg=cfg.scene_graph,
+                        target_obj_id=target_obj_id,
+                        return_annotated=True
+                    )
+
+                    # check stop condition
+                    if target_in_view:
+                        if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                            target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
+                            if target_obj_pix_ratio > 0:
+                                obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
+                                bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                                # currently just consider that the object should be in around the horizontal center, not the vertical center
+                                # due to the viewing angle difference
+                                if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
+                                    logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
+                                    target_found = True
 
                     # TSDF fusion
                     tsdf_planner.integrate(
@@ -271,17 +317,17 @@ def main(cfg):
                         observation_save_dir = os.path.join(episode_data_dir, 'observations')
                         os.makedirs(observation_save_dir, exist_ok=True)
                         if target_found:
-                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), rgb)
+                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
                         else:
-                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), rgb)
-                        semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
-                        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-                        semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
-                        semantic_img = semantic_img.convert("RGBA")
-                        if target_found:
-                            semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
-                        else:
-                            semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
+                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
+                        # semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
+                        # semantic_img.putpalette(d3_40_colors_rgb.flatten())
+                        # semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
+                        # semantic_img = semantic_img.convert("RGBA")
+                        # if target_found:
+                        #     semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
+                        # else:
+                        #     semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
 
                     if target_found:
                         break
@@ -325,11 +371,21 @@ def main(cfg):
                         frontier_dict["rgb_id"] = frontier.image
                     else:
                         view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                        if np.linalg.norm(view_frontier_direction) < 1e-3:
+                            continue
                         default_view_direction = np.asarray([0., 0., -1.])
-                        agent_state.rotation = quat_to_coeffs(
-                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                        ).tolist()
+                        if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                            # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                            # we need to specify rotating along y-axis
+                            agent_state.rotation = quat_to_coeffs(
+                                quaternion.quaternion(0, 0, 1, 0)
+                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                            ).tolist()
+                        else:
+                            agent_state.rotation = quat_to_coeffs(
+                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                            ).tolist()
                         agent.set_state(agent_state)
                         # Get observation at current pose - skip black image, meaning robot is outside the floor
                         obs = simulator.get_sensor_observations()

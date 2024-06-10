@@ -14,6 +14,8 @@ import quaternion
 
 from openai import AzureOpenAI
 from PIL import Image
+from inference.models import YOLOWorld
+import supervision as sv
 
 import sys
 from pathlib import Path
@@ -29,11 +31,67 @@ from script.background_prompts import background_prompts
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors
 
 
+def IoU(region_1, region_2):
+    # region 1, 2: boolean array of the same shape
+    intersection = np.sum(region_1 & region_2)
+    union = np.sum(region_1 | region_2)
+    return intersection / union
+
+
+def test_object_detection(model, rgb, semantic_obs, target_obj_id, obj_id_to_name, name_to_obj_id):
+    target_ojb_name = obj_id_to_name[target_obj_id]
+    unique_obj_ids = np.unique(semantic_obs)
+    all_classes = []
+    for obj_id in unique_obj_ids:
+        if obj_id == 0 or obj_id not in obj_id_to_name or obj_id_to_name[obj_id] in ['wall', 'floor', 'ceiling']:
+            continue
+        all_classes.append(obj_id_to_name[obj_id])
+    all_classes = list(set(all_classes))
+
+    if len(all_classes) == 0:
+        return False
+
+    model.set_classes(all_classes)
+
+    results = model.infer(rgb, confidence=0.001)
+    detections = sv.Detections.from_inference(results).with_nms(threshold=0.1)
+    for i in range(len(detections)):
+        class_name = all_classes[detections.class_id[i]]
+        if class_name == target_ojb_name:
+            x_start, y_start, x_end, y_end = detections.xyxy[i].astype(int)
+            bbox_mask = np.zeros(semantic_obs.shape, dtype=bool)
+            bbox_mask[y_start:y_end, x_start:x_end] = True
+
+            for obj_id in name_to_obj_id[class_name]:
+                if obj_id not in unique_obj_ids:
+                    continue
+                obj_x_start, obj_y_start = np.argwhere(semantic_obs == obj_id).min(axis=0)
+                obj_x_end, obj_y_end = np.argwhere(semantic_obs == obj_id).max(axis=0)
+                obj_mask = np.zeros(semantic_obs.shape, dtype=bool)
+                obj_mask[obj_x_start:obj_x_end, obj_y_start:obj_y_end] = True
+                if IoU(bbox_mask, obj_mask) > 0.75:
+                    return True
+    return False
+
+
 def main(cfg):
     # scene_list = ['00800-TEEsavR23oF']
-    available_scene_dir = '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/scene_feature_dict'
-    scene_list = os.listdir(available_scene_dir)
-    scene_list = [scene_name for scene_name in scene_list if os.path.isdir(os.path.join(available_scene_dir, scene_name))]
+    scene_files = 'files.txt'
+    scene_list = []
+    with open(scene_files, "r") as f:
+        for line in f.readlines():
+            scene_list.append(line.strip())
+    # scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) > 203]
+    
+    generated_results_folder = 'generated_questions'
+    generated_lists = os.listdir(generated_results_folder)
+    generated_lists = [img for img in generated_lists if img.endswith('.png')]
+    generated_lists = [int(f.split('-')[0]) for f in generated_lists]
+    generated_lists = list(set(generated_lists))
+    generated_lists = [idx for idx in generated_lists if idx != 324 and idx != 366 and idx != 657 and idx != 669]
+    scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) != 324 and int(scene_name.split('-')[0]) != 366 and int(scene_name.split('-')[0]) != 657 and int(scene_name.split('-')[0]) != 669]
+    scene_list = [scene_name for scene_name in scene_list if int(scene_name.split('-')[0]) > max(generated_lists)]
+    scene_list.sort()
 
 
 
@@ -64,6 +122,9 @@ def main(cfg):
         else:
             scene_path_list.append(os.path.join(cfg.dataset_path, 'val', scene_name))
 
+
+    detection_model = YOLOWorld(model_id="yolo_world/s")
+
     # traverse each scene
     for scene_path in scene_path_list:
         # Load the scene
@@ -72,6 +133,11 @@ def main(cfg):
         navmesh_file = os.path.join(scene_path, scene_name + '.basis' + '.navmesh')
         scene_semantic_texture_file = os.path.join(scene_path, scene_name + ".semantic" + ".glb")
         scene_semantic_annotation_file = os.path.join(scene_path, scene_name + ".semantic" + ".txt")
+
+        if not os.path.exists(scene_mesh_dir) or not os.path.exists(navmesh_file) or not os.path.exists(scene_semantic_texture_file) or not os.path.exists(scene_semantic_annotation_file):
+            logging.info(f"Scene not found: {scene_name}")
+            continue
+
         assert os.path.exists(scene_mesh_dir) and os.path.exists(navmesh_file)
         assert os.path.exists(scene_semantic_texture_file) and os.path.exists(scene_semantic_annotation_file)
 
@@ -90,7 +156,11 @@ def main(cfg):
             "scene_dataset_config_file": cfg.scene_dataset_config_file,
         }
         sim_config = make_simple_cfg(sim_settings)
-        simulator = habitat_sim.Simulator(sim_config)
+        try:
+            simulator = habitat_sim.Simulator(sim_config)
+        except:
+            logging.info(f"Failed to load the simulator for {scene_name}!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            continue
 
         scene = simulator.semantic_scene
         logging.info(f"Scene loaded: {scene_name}")
@@ -295,6 +365,17 @@ def main(cfg):
                     focus_class = valid_observation["rare_class"]
                     reference_img = valid_observation["rgb"]
 
+                    if not test_object_detection(
+                        model=detection_model,
+                        rgb=valid_observation["rgb"][..., :3],
+                        semantic_obs=valid_observation["semantic"],
+                        target_obj_id=valid_observation["rare_obj_id"],
+                        obj_id_to_name=obj_id_to_class,
+                        name_to_obj_id=class_to_object
+                    ):
+                        logging.info(f"Object detection failed for {rare_obj_id}-{rare_class}!")
+                        continue
+
                     question_category = random.choice(question_categories)
 
                     # construct the prompt
@@ -370,6 +451,7 @@ def main(cfg):
                     # generate a random question id
                     question_id = f'{scene_path.split("/")[-1]}_{rare_obj_id}_{rare_class}_{random.randint(0, 1000000)}'
                     question_id = question_id.replace(' ', '_')
+                    question_id = question_id.replace('/', '_')
 
                     # save the observation image
                     img_save_path = os.path.join(cfg.save_dir, f"{question_id}.png")
