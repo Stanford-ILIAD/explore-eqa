@@ -32,7 +32,6 @@ from src.habitat import (
     get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, check_distance, get_collision_distance
-from src.vlm import VLM
 from src.tsdf_tempt import TSDFPlanner
 from habitat_sim.utils.common import d3_40_colors_rgb
 
@@ -75,7 +74,7 @@ def main(cfg):
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
         # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00657-TSJmdttd2GV_505_newspaper_733906']
         random.shuffle(all_questions_in_scene)
-        all_questions_in_scene = all_questions_in_scene[:3]
+        # all_questions_in_scene = all_questions_in_scene[:]
         # all_questions_in_scene.sort()
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
@@ -88,6 +87,11 @@ def main(cfg):
         scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
         assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
 
+        try:
+            del tsdf_planner.detection_model
+            del tsdf_planner
+        except:
+            pass
         try:
             simulator.close()
         except:
@@ -114,6 +118,7 @@ def main(cfg):
         # load semantic object bbox data
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
+        object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
         #
         # # Load the semantic annotation
         # obj_id_to_class = {}
@@ -161,6 +166,7 @@ def main(cfg):
             floor_height = target_position[1]
             tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
             try:
+                del tsdf_planner.detection_model
                 del tsdf_planner
             except:
                 pass
@@ -170,6 +176,7 @@ def main(cfg):
                 floor_height_offset=0,
                 pts_init=pos_habitat_to_normal(start_position),
                 init_clearance=cfg.init_clearance * 2,
+                detection_model_name=cfg.detection_model_name,
             )
 
             # convert path points to normal and drop y-axis for tsdf planner
@@ -244,29 +251,38 @@ def main(cfg):
                     keep_observation = True
                     black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
                     if black_pix_ratio > cfg.black_pixel_ratio:
-                        keep_observation = f'black_pixel_ratio_{black_pix_ratio}'
-                    mean_depth = np.mean(depth[depth > 0])
-                    if mean_depth < cfg.min_avg_depth:
-                        keep_observation = f'min_avg_depth_{mean_depth}'
+                        keep_observation = False
                     if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
-                        keep_observation = f'min_30_percentile_depth_{np.percentile(depth[depth > 0], 30)}'
-                    keep_observation = f'{black_pix_ratio:.2f}_{mean_depth:.2f}_{np.percentile(depth[depth > 0], 30):.2f}_{np.percentile(depth[depth > 0], 50):.2f}_{collision_dist:.3f}'
-
-                    # check stop condition
-                    target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
-                    if target_obj_pix_ratio > 0:
-                        obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
-                        bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
-                        # currently just consider that the object should be in around the horizontal center, not the vertical center
-                        # due to the viewing angle difference
-                        if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
-                            logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
-                            target_found = True
+                        keep_observation = True
+                    if not keep_observation:
+                        logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                        continue
 
                     # construct an frequency count map of each semantic id to a unique id
-                    masked_ids = np.unique(semantic_obs[depth > 3.0])
-                    semantic_obs = np.where(np.isin(semantic_obs, masked_ids), 0, semantic_obs)
-                    tsdf_planner.increment_scene_graph(semantic_obs, object_id_to_bbox, min_pix_ratio=cfg.min_pix_ratio)
+                    target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
+                        rgb=rgb[..., :3],
+                        semantic_obs=semantic_obs,
+                        obj_id_to_name=object_id_to_name,
+                        obj_id_to_bbox=object_id_to_bbox,
+                        cfg=cfg.scene_graph,
+                        target_obj_id=target_obj_id,
+                        return_annotated=True
+                    )
+
+                    # check stop condition
+                    if target_in_view:
+                        if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                            target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
+                            if target_obj_pix_ratio > 0:
+                                obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
+                                bias_from_center = (obj_pix_center - np.asarray(
+                                    [img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                                # currently just consider that the object should be in around the horizontal center, not the vertical center
+                                # due to the viewing angle difference
+                                if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[
+                                    1] < cfg.stop_max_bias_from_center:
+                                    logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
+                                    target_found = True
 
                     # TSDF fusion
                     tsdf_planner.integrate(
@@ -281,17 +297,17 @@ def main(cfg):
 
                     if cfg.save_obs:
                         if target_found:
-                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), rgb)
+                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
                         else:
-                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-{keep_observation}.png"), rgb)
-                        semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
-                        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-                        semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
-                        semantic_img = semantic_img.convert("RGBA")
-                        if target_found:
-                            semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
-                        else:
-                            semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
+                            plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
+                        # semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
+                        # semantic_img.putpalette(d3_40_colors_rgb.flatten())
+                        # semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
+                        # semantic_img = semantic_img.convert("RGBA")
+                        # if target_found:
+                        #     semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
+                        # else:
+                        #     semantic_img.save(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
 
                     if target_found:
                         break

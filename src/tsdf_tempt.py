@@ -41,6 +41,8 @@ from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
+from inference.models import YOLOWorld
+import supervision as sv
 
 
 @dataclass
@@ -81,6 +83,7 @@ class TSDFPlanner:
         floor_height_offset=0,
         pts_init=None,
         init_clearance=0,
+        detection_model_name="yolo_world/s",
     ):
         """Constructor.
         Args:
@@ -163,22 +166,98 @@ class TSDFPlanner:
         self.frontier_map = np.zeros(self._vol_dim[:2], dtype=int)
         self.frontier_counter = 1
 
-    def increment_scene_graph(self, semantic_obs, obj_id_to_bbox, min_pix_ratio=0.0):
-        unique_semantic_ids = np.unique(semantic_obs)
-        for obj_id in unique_semantic_ids:
-            if obj_id not in self.simple_scene_graph.keys() and obj_id != 0 and obj_id in obj_id_to_bbox.keys():
-                bbox_data = obj_id_to_bbox[obj_id]
-                if bbox_data['class'] in ["wall", "floor", "ceiling"]:
+        # object detection model
+        self.detection_model = YOLOWorld(model_id=detection_model_name)
+
+    # def increment_scene_graph(self, semantic_obs, obj_id_to_bbox, min_pix_ratio=0.0):
+    #     unique_semantic_ids = np.unique(semantic_obs)
+    #     for obj_id in unique_semantic_ids:
+    #         if obj_id not in self.simple_scene_graph.keys() and obj_id != 0 and obj_id in obj_id_to_bbox.keys():
+    #             bbox_data = obj_id_to_bbox[obj_id]
+    #             if bbox_data['class'] in ["wall", "floor", "ceiling"]:
+    #                 continue
+    #             if np.sum(semantic_obs == obj_id) / (semantic_obs.shape[0] * semantic_obs.shape[1]) < min_pix_ratio:
+    #                 continue
+    #             bbox = bbox_data["bbox"]
+    #             bbox = np.asarray(bbox)
+    #             bbox_center = np.mean(bbox, axis=0)
+    #             # change to x, z, y for habitat
+    #             bbox_center = bbox_center[[0, 2, 1]]
+    #             # add to simple scene graph
+    #             self.simple_scene_graph[obj_id] = bbox_center
+
+    def update_scene_graph(self, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id, return_annotated=False):
+        target_found = False
+
+        unique_obj_ids = np.unique(semantic_obs)
+        class_to_obj_id = {}
+        for obj_id in unique_obj_ids:
+            if obj_id == 0 or obj_id not in obj_id_to_name.keys() or obj_id_to_name[obj_id] in ['wall', 'floor', 'ceiling']:
+                continue
+            if obj_id_to_name[obj_id] not in class_to_obj_id.keys():
+                class_to_obj_id[obj_id_to_name[obj_id]] = [obj_id]
+            else:
+                class_to_obj_id[obj_id_to_name[obj_id]].append(obj_id)
+        all_classes = list(class_to_obj_id.keys())
+
+        if len(all_classes) == 0:
+            if return_annotated:
+                return target_found, rgb
+            else:
+                return target_found
+
+        self.detection_model.set_classes(all_classes)
+
+        results = self.detection_model.infer(rgb, confidence=cfg.confidence)
+        detections = sv.Detections.from_inference(results).with_nms(threshold=cfg.nms_threshold)
+
+        adopted_indices = []
+        for i in range(len(detections)):
+            class_name = all_classes[detections.class_id[i]]
+            x_start, y_start, x_end, y_end = detections.xyxy[i].astype(int)
+            bbox_mask = np.zeros(semantic_obs.shape, dtype=bool)
+            bbox_mask[y_start:y_end, x_start:x_end] = True
+            for obj_id in class_to_obj_id[class_name]:
+
+                if obj_id not in obj_id_to_bbox.keys():
                     continue
-                if np.sum(semantic_obs == obj_id) / (semantic_obs.shape[0] * semantic_obs.shape[1]) < min_pix_ratio:
-                    continue
-                bbox = bbox_data["bbox"]
-                bbox = np.asarray(bbox)
-                bbox_center = np.mean(bbox, axis=0)
-                # change to x, z, y for habitat
-                bbox_center = bbox_center[[0, 2, 1]]
-                # add to simple scene graph
-                self.simple_scene_graph[obj_id] = bbox_center
+
+                obj_x_start, obj_y_start = np.argwhere(semantic_obs == obj_id).min(axis=0)
+                obj_x_end, obj_y_end = np.argwhere(semantic_obs == obj_id).max(axis=0)
+                obj_mask = np.zeros(semantic_obs.shape, dtype=bool)
+                obj_mask[obj_x_start:obj_x_end, obj_y_start:obj_y_end] = True
+                if IoU(bbox_mask, obj_mask) > cfg.iou_threshold:
+                    # this object is counted as detected
+                    # add to the scene graph
+                    if obj_id not in self.simple_scene_graph.keys():
+                        bbox = obj_id_to_bbox[obj_id]["bbox"]
+                        bbox = np.asarray(bbox)
+                        bbox_center = np.mean(bbox, axis=0)
+                        # change to x, z, y for habitat
+                        bbox_center = bbox_center[[0, 2, 1]]
+                        # add to simple scene graph
+                        self.simple_scene_graph[obj_id] = bbox_center
+
+                    adopted_indices.append(i)
+                    if obj_id == target_obj_id:
+                        target_found = True
+
+                    break
+
+        if return_annotated:
+            if len(adopted_indices) == 0:
+                return target_found, rgb
+
+            # filter out the detections that are not adopted
+            detections = detections[adopted_indices]
+
+            annotated_image = rgb.copy()
+            BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator(thickness=2)
+            LABEL_ANNOTATOR = sv.LabelAnnotator(text_thickness=2, text_scale=1, text_color=sv.Color.BLACK)
+            annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections)
+            annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections)
+            return target_found, annotated_image
+
 
     @staticmethod
     @njit(parallel=True)
