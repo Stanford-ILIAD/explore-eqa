@@ -120,7 +120,7 @@ def main(cfg):
 
         for question_data in all_questions_in_scene:
             # for each question, generate several paths, starting from different starting points
-            for path_idx in range(cfg.paths_per_scene):
+            for path_idx in range(cfg.paths_per_question):
                 question_ind += 1
 
                 target_obj_id = question_data['object_id']
