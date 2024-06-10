@@ -296,10 +296,10 @@ def get_nearest_true_point(point, bool_map):
     H, W = bool_map.shape
     x, y = point
     x, y = int(x), int(y)
-    if bool_map[x, y]:
-        return point
     if x < 0 or x >= H or y < 0 or y >= W:
         return None
+    if bool_map[x, y]:
+        return point
     horizontal_found = False
     for i in range(1, max(H, W)):
         for j in range(i + 1):
@@ -376,6 +376,9 @@ def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
 
     direction = direction / np.linalg.norm(direction)
     final_point = point + direction * dist
+
+    H, W = unoccupied_map.shape
+    final_point = np.clip(final_point, [0, 0], [H - 1, W - 1])
 
     # ensure the final point is navigable
     final_point = get_nearest_true_point(final_point, unoccupied_map)

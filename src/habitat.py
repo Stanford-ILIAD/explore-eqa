@@ -231,12 +231,18 @@ def get_quaternion(angle, camera_tilt):
     ).tolist()
 
 
-def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6):
+def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6, prev_start_positions=None, min_dist_from_prev=3):
     pos_end = None
     path_points = None
-    try_count = 0
     max_distance_history = -1
-    # try to find a path that is long enough
+
+    pos_end_with_prev = None
+    path_points_with_prev = None
+    max_distance_history_with_prev = -1
+
+    # if no previous start positions, just find a random navigable point that is the farthest among the searches
+    # otherwise, find the point that is the farthest from the previous start positions, and also satisfies the min_dist
+    try_count = 0
     while True:
         try_count += 1
         if try_count > max_search:
@@ -256,17 +262,44 @@ def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6)
                 pos_end = pos_end_current
                 path_points = path.points
 
-        if found_path and max_distance_history > min_dist:
+            if prev_start_positions is not None:
+                if np.all(
+                    np.linalg.norm(
+                        prev_start_positions - pos_end_current, axis=1
+                    ) > min_dist_from_prev
+                ):
+                    if path.geodesic_distance > max_distance_history_with_prev:
+                        max_distance_history_with_prev = path.geodesic_distance
+                        pos_end_with_prev = pos_end_current
+                        path_points_with_prev = path.points
+
+        if found_path and max_distance_history > min_dist and prev_start_positions is None:
+            break
+        if found_path and max_distance_history_with_prev > min_dist and prev_start_positions is not None:
             break
 
+    # satiny check
     if pos_end is not None and path_points is not None:
         assert np.array_equal(path_points[0], np.asarray(pos_start, dtype=np.float32)) and np.array_equal(path_points[-1], pos_end)
+    if pos_end_with_prev is not None and path_points_with_prev is not None:
+        assert np.array_equal(path_points_with_prev[0], np.asarray(pos_start, dtype=np.float32)) and np.array_equal(path_points_with_prev[-1], pos_end_with_prev)
 
-    return pos_end, path_points, max_distance_history
+    if prev_start_positions is None:
+        return pos_end, path_points, max_distance_history
+    else:
+        if pos_end_with_prev is not None and path_points_with_prev is not None and max_distance_history_with_prev > min_dist:
+            print(f'Found point success!!!!!!!!!!!!!!!!!!!!!!!')
+            return pos_end_with_prev, path_points_with_prev, max_distance_history_with_prev
+        else:
+            # if no point is found that satisfies the min_dist, just return the farthest point
+            print(f'No point found that satisfies the min_dist, return the farthest point!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            return pos_end, path_points, max_distance_history
 
 
-def get_navigable_point_to(pos_end, pathfinder, max_search=1000, min_dist=6):
-    pos_start, path_point, travel_dist = get_navigable_point_from(pos_end, pathfinder, max_search, min_dist)
+def get_navigable_point_to(pos_end, pathfinder, max_search=1000, min_dist=6, prev_start_positions=None):
+    pos_start, path_point, travel_dist = get_navigable_point_from(
+        pos_end, pathfinder, max_search, min_dist, prev_start_positions
+    )
     if pos_start is None or path_point is None:
         return None, None
 

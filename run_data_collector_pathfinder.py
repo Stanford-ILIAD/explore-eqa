@@ -14,6 +14,7 @@ import csv
 import pickle
 import json
 import logging
+import glob
 import math
 import quaternion
 import matplotlib.pyplot as plt
@@ -121,7 +122,7 @@ def main(cfg):
 
         for question_data in all_questions_in_scene:
             # for each question, generate several paths, starting from different starting points
-            for path_idx in range(cfg.paths_per_question):
+            for path_idx in range(cfg.path_id_offset, cfg.path_id_offset + cfg.paths_per_question):
                 question_ind += 1
 
                 target_obj_id = question_data['object_id']
@@ -138,9 +139,25 @@ def main(cfg):
                 os.makedirs(episode_data_dir, exist_ok=True)
                 os.makedirs(episode_frontier_dir, exist_ok=True)
 
+                # get the starting points of other generated paths for this object, if there exists any
+                # get all the folder in the form os.path.join(str(cfg.dataset_output_dir), f"{question_data['question_id']}_path_*")
+                glob_path = os.path.join(str(cfg.dataset_output_dir), f"{question_data['question_id']}_path_*")
+                all_generated_path_dirs = glob.glob(glob_path)
+                prev_start_positions = []
+                for path_dir in all_generated_path_dirs:
+                    metadata_path = os.path.join(path_dir, "metadata.json")
+                    if os.path.exists(metadata_path):
+                        with open(metadata_path, "r") as f:
+                            prev_start_positions.append(json.load(f)["init_pts"])
+                if len(prev_start_positions) == 0:
+                    prev_start_positions = None
+                else:
+                    prev_start_positions = np.asarray(prev_start_positions)
+
                 # get a navigation start point
                 start_position, path_points, travel_dist = get_navigable_point_to(
-                    target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist
+                    target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist,
+                    prev_start_positions=prev_start_positions
                 )
                 if start_position is None or path_points is None:
                     logging.info(f"Cannot find a navigable path to the target object in question {question_data['question_id']}-path {path_idx}!")
@@ -471,6 +488,8 @@ if __name__ == "__main__":
     # get config path
     parser = argparse.ArgumentParser()
     parser.add_argument("-cf", "--cfg_file", help="cfg file path", default="", type=str)
+    parser.add_argument("--path_id_offset", default=0, type=int)
+    parser.add_argument("--seed", default=None, type=int)
     args = parser.parse_args()
     cfg = OmegaConf.load(args.cfg_file)
     OmegaConf.resolve(cfg)
@@ -493,6 +512,10 @@ if __name__ == "__main__":
             logging.StreamHandler(),
         ],
     )
+
+    cfg.path_id_offset = args.path_id_offset
+    if args.seed is not None:
+        cfg.seed = args.seed
 
     # run
     logging.info(f"***** Running {cfg.exp_name} *****")
