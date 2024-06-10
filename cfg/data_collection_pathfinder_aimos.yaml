@@ -22,7 +22,7 @@ tsdf_grid_size: 0.1
 margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
-save_obs: true
+save_obs: false
 save_visualization: false
 save_frontier_video: false
 del_fail_case: true
