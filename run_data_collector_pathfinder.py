@@ -398,6 +398,11 @@ def main(cfg):
                     else:
                         raise ValueError("Invalid max_point_choice type")
                     assert len(prediction) == len(step_dict["scene_graph"]) + len(step_dict["frontiers"]), f"{len(prediction)} != {len(step_dict['scene_graph'])} + {len(step_dict['frontiers'])}"
+                    if sum(prediction) != 1.0:
+                        logging.info(f"Error! Prediction sum is not 1.0: {sum(prediction)}")
+                        logging.info(max_point_choice)
+                        logging.info(tsdf_planner.frontiers)
+                        break
                     assert sum(prediction) == 1.0, f"{sum(prediction)} != 1.0"
                     step_dict["prediction"] = prediction
 
