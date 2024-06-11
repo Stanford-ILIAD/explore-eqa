@@ -1389,7 +1389,9 @@ class TSDFPlanner:
             frontier_edge_areas = frontier_edge_areas_filtered
 
         all_directions = frontier_edge_areas - cur_point[:2]
-        all_directions = all_directions / np.linalg.norm(all_directions, axis=1, keepdims=True)
+        all_direction_norm = np.linalg.norm(all_directions, axis=1, keepdims=True)
+        all_direction_norm = np.where(all_direction_norm == 0, np.inf, all_direction_norm)
+        all_directions = all_directions / all_direction_norm
         center = frontier_edge_areas[
             np.argmax(np.dot(all_directions, ft_direction))
         ]

@@ -277,7 +277,8 @@ def main(cfg):
                         black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
                         if black_pix_ratio > cfg.black_pixel_ratio:
                             keep_observation = False
-                        if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
+                        positive_depth = depth[depth > 0]
+                        if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
                             keep_observation = False
                         if not keep_observation and view_idx != total_views - 1:
                             # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
