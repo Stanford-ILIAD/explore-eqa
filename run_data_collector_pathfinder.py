@@ -469,6 +469,8 @@ def main(cfg):
                     pts = pos_normal_to_habitat(pts_normal)
                     rotation = get_quaternion(angle, camera_tilt)
 
+                    logging.info(f"Current position: {pts}")
+
                 if target_found:
                     metadata["episode_length"] = cnt_step
                     with open(os.path.join(episode_data_dir, "metadata.json"), "w") as f:
