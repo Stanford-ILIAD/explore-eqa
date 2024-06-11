@@ -33,7 +33,7 @@ from src.habitat import (
     get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
-from src.tsdf import TSDFPlanner, Frontier, Object
+from src.tsdf_tempt import TSDFPlanner, Frontier, Object
 from habitat_sim.utils.common import d3_40_colors_rgb
 from inference.models import YOLOWorld
 
@@ -74,7 +74,9 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if q['question_id'] == '00324-DoSbsoo4EAg_240_cutting_board_878397']
+        all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
+        if len(all_questions_in_scene) == 0:
+            continue
         # random.shuffle(all_questions_in_scene)
         # all_questions_in_scene = all_questions_in_scene[:2]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
@@ -359,22 +361,50 @@ def main(cfg):
 
                     step_dict["frontiers"] = []
 
-                    # determine the next point and move the agent
-                    return_values = tsdf_planner.find_next_pose_with_path(
+                    # # determine the next point and move the agent
+                    # return_values = tsdf_planner.find_next_pose_with_path(
+                    #     pts=pts_normal,
+                    #     angle=angle,
+                    #     path_points=path_points,
+                    #     pathfinder=pathfinder,
+                    #     target_obj_id=target_obj_id,
+                    #     cfg=cfg.planner,
+                    #     save_visualization=cfg.save_visualization,
+                    #     return_choice=True
+                    # )
+                    # if return_values[0] is None:
+                    #     logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid!")
+                    #     break
+                    #
+                    # pts_normal, angle, pts_pix, fig, path_points, max_point_choice = return_values
+
+                    tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
+
+                    max_point_choice = tsdf_planner.get_next_choice(
                         pts=pts_normal,
                         angle=angle,
                         path_points=path_points,
                         pathfinder=pathfinder,
                         target_obj_id=target_obj_id,
                         cfg=cfg.planner,
-                        save_visualization=cfg.save_visualization,
-                        return_choice=True
                     )
-                    if return_values[0] is None:
-                        logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid!")
+                    if max_point_choice is None:
+                        logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid: no valid choice!")
                         break
 
-                    pts_normal, angle, pts_pix, fig, path_points, max_point_choice = return_values
+                    return_values = tsdf_planner.get_next_navigation_point(
+                        choice=max_point_choice,
+                        pts=pts_normal,
+                        angle=angle,
+                        path_points=path_points,
+                        pathfinder=pathfinder,
+                        cfg=cfg.planner,
+                        save_visualization=cfg.save_visualization,
+                    )
+                    if return_values[0] is None:
+                        logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid: find next navigation point failed!")
+                        break
+                    pts_normal, angle, pts_pix, fig, path_points = return_values
 
                     # Turn to face each frontier point and get rgb image
                     # print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
