@@ -134,7 +134,11 @@ def main(cfg):
                 # if the data has already generated, skip
                 if os.path.exists(episode_data_dir) and os.path.exists(os.path.join(episode_data_dir, "metadata.json")):
                     logging.info(f"Question id {question_data['question_id']}-path {path_idx} already exists")
+                    success_count += 1
                     continue
+
+                if os.path.exists(episode_data_dir) and not os.path.exists(os.path.join(episode_data_dir, "metadata.json")):
+                    os.system(f"rm -r {episode_data_dir}")
 
                 os.makedirs(episode_data_dir, exist_ok=True)
                 os.makedirs(episode_frontier_dir, exist_ok=True)
@@ -155,6 +159,7 @@ def main(cfg):
                     prev_start_positions = np.asarray(prev_start_positions)
 
                 # get a navigation start point
+                pathfinder.seed(random.randint(0, 1000000))
                 start_position, path_points, travel_dist = get_navigable_point_to(
                     target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist,
                     prev_start_positions=prev_start_positions
@@ -211,7 +216,9 @@ def main(cfg):
                 # run steps
                 target_found = False
                 num_step = int(travel_dist * cfg.max_step_dist_ratio)
-                for cnt_step in range(num_step):
+                cnt_step = -1
+                while cnt_step < num_step - 1:
+                    cnt_step += 1
 
                     step_dict = {}
                     step_dict["agent_state"] = {}
@@ -341,6 +348,10 @@ def main(cfg):
 
                     if target_found:
                         break
+
+                    if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                        # if the target object is in the scene graph, give more steps to allow slowly moving to the target
+                        num_step = int(travel_dist * (cfg.max_step_dist_ratio + 0.5))
 
                     # record current scene graph
                     step_dict["scene_graph"] = list(tsdf_planner.simple_scene_graph.keys())

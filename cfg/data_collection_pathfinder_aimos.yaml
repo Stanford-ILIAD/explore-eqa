@@ -67,7 +67,7 @@ planner:
   eps: 1
   min_dist_from_cur: 0.5
   max_dist_from_cur_phase_1: 1  # when the target object is not found, explore the frontiers with this step length
-  max_dist_from_cur_phase_2: 0.4  # when the target object is found, go to the target object with this step length
+  max_dist_from_cur_phase_2: 0.5  # when the target object is found, go to the target object with this step length
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
   final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
