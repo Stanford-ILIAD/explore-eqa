@@ -6,7 +6,7 @@ question_data_path: "generated_questions"
 scene_dataset_config_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
 scene_data_path: "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d"
 semantic_bbox_data_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_obj_bbox_merged'
-dataset_output_dir: "exploration_data"
+dataset_output_dir: "exploration_data_part2"
 detection_model_name: "yolo_world/x"
 
 # Sample navigation point
