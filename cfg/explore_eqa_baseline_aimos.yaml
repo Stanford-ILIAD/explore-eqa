@@ -16,7 +16,7 @@ vlm:
   hf_token:
   device: cuda
   model_id: prism-dinosiglip+7b
-  cache_dir: '~/scratch/yanghan/cache/'
+  cache_dir: '/gpfs/u/home/LMCG/LMCGnngn/scratch/yanghan/cache/'
 
 # Camera, image
 camera_height: 1.5
