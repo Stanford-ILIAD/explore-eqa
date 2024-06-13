@@ -8,7 +8,7 @@ from prismatic import load
 class VLM:
     def __init__(self, cfg):
         start_time = time.time()
-        self.model = load(cfg.model_id, hf_token=cfg.hf_token)
+        self.model = load(cfg.model_id, hf_token=cfg.hf_token, cache_dir=cfg.cache_dir)
         self.model.to(cfg.device, dtype=torch.bfloat16)
         logging.info(f"Loaded VLM in {time.time() - start_time:.3f}s")
 

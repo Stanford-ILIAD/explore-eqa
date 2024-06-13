@@ -1,0 +1,79 @@
+# General
+seed: 42
+exp_name: vlm_exp
+#output_parent_dir: '/work/pi_chuangg_umass_edu/yuncong/results'
+output_parent_dir: 'results'
+question_data_path: "generated_questions"
+scene_dataset_config_path: '/project/pi_chuangg_umass_edu/yuncong/data_v2/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
+scene_data_path: '/project/pi_chuangg_umass_edu/yuncong/data_v2/scene_datasets/hm3d/'
+semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_obj_bbox_merged'
+detection_model_name: "yolo_world/x"
+path_data_dir: '/home/yuncongyang_umass_edu/scene_understanding/explore-eqa-test/exploration_data/'
+save_obs: true
+save_freq: 10
+
+# Question answering
+vlm:
+  hf_token:
+  device: cuda
+  model_id: prism-dinosiglip+7b
+  cache_dir: /project/pi_chuangg_umass_edu/yuncong/checkpoints
+
+# Camera, image
+camera_height: 1.5
+camera_tilt_deg: -30
+img_width: 640
+img_height: 480
+hfov: 120
+tsdf_grid_size: 0.1
+margin_w_ratio: 0.25
+margin_h_ratio: 0.6
+
+# Stop criteria
+stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
+stop_max_bias_from_center: 0.4  # the target object should be within 60% of the image center horizontally
+
+# Navigation
+init_clearance: 0.5
+max_step_room_size_ratio: 3
+black_pixel_ratio: 0.5
+min_random_init_steps: 2
+
+# Semantic map
+use_active: true
+use_lsv: true
+use_gsv: true
+gsv_T: 0.5
+gsv_F: 3
+planner:
+  dist_T: 10
+  unexplored_T: 0.2
+  unoccupied_T: 2.0
+  val_T: 0.5
+  val_dir_T: 0.5
+  max_val_check_frontier: 3
+  smooth_sigma: 5
+  eps: 1
+  min_dist_from_cur: 0.5
+  max_dist_from_cur: 3
+  frontier_spacing: 1.5
+  frontier_min_neighbors: 3
+  frontier_max_neighbors: 4
+  max_unexplored_check_frontier: 3
+  max_unoccupied_check_frontier: 1
+
+visual_prompt:
+  cluster_threshold: 1.0
+  num_prompt_points: 3
+  num_max_unoccupied: 300
+  min_points_for_clustering: 3
+  point_min_dist: 2
+  point_max_dist: 10
+  cam_offset: 0.6
+  min_num_prompt_points: 2
+  circle_radius: 18
+
+scene_graph:
+  confidence: 0.003
+  nms_threshold: 0.1
+  iou_threshold: 0.5
