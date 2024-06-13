@@ -1,9 +1,5 @@
-"""
-Run EQA in Habitat-Sim with VLM exploration.
-
-"""
-
 import os
+import random
 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -16,24 +12,87 @@ import numpy as np
 np.set_printoptions(precision=3)
 import csv
 import pickle
+import json
 import logging
 import math
 import quaternion
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+from inference.models import YOLOWorld
+import supervision as sv
 import habitat_sim
-from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis
+from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
     make_simple_cfg,
+    make_semantic_cfg,
     pos_normal_to_habitat,
     pos_habitat_to_normal,
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
+    get_quaternion,
+    get_navigable_point_to
 )
-from src.geom import get_cam_intr, get_scene_bnds
+from src.geom import get_cam_intr, get_scene_bnds, IoU
 from src.vlm import VLM
 from src.tsdf import TSDFPlanner
+
+
+def update_scene_graph(detection_model, scene_objects, rgb, semantic_obs, obj_id_to_name, cfg, target_obj_id):
+    target_found = False
+
+    unique_obj_ids = np.unique(semantic_obs)
+    class_to_obj_id = {}
+    for obj_id in unique_obj_ids:
+        if obj_id == 0 or obj_id not in obj_id_to_name.keys() or obj_id_to_name[obj_id] in ['wall', 'floor', 'ceiling']:
+            continue
+        if obj_id_to_name[obj_id] not in class_to_obj_id.keys():
+            class_to_obj_id[obj_id_to_name[obj_id]] = [obj_id]
+        else:
+            class_to_obj_id[obj_id_to_name[obj_id]].append(obj_id)
+    all_classes = list(class_to_obj_id.keys())
+
+    if len(all_classes) == 0:
+        return target_found, rgb
+
+    detection_model.set_classes(all_classes)
+
+    results = detection_model.infer(rgb, confidence=cfg.confidence)
+    detections = sv.Detections.from_inference(results).with_nms(threshold=cfg.nms_threshold)
+
+    adopted_indices = []
+    for i in range(len(detections)):
+        class_name = all_classes[detections.class_id[i]]
+        x_start, y_start, x_end, y_end = detections.xyxy[i].astype(int)
+        bbox_mask = np.zeros(semantic_obs.shape, dtype=bool)
+        bbox_mask[y_start:y_end, x_start:x_end] = True
+        for obj_id in class_to_obj_id[class_name]:
+            obj_x_start, obj_y_start = np.argwhere(semantic_obs == obj_id).min(axis=0)
+            obj_x_end, obj_y_end = np.argwhere(semantic_obs == obj_id).max(axis=0)
+            obj_mask = np.zeros(semantic_obs.shape, dtype=bool)
+            obj_mask[obj_x_start:obj_x_end, obj_y_start:obj_y_end] = True
+            if IoU(bbox_mask, obj_mask) > cfg.iou_threshold:
+                if obj_id not in scene_objects:
+                    scene_objects.append(obj_id)
+                adopted_indices.append(i)
+                if obj_id == target_obj_id:
+                    target_found = True
+                break
+
+    if len(adopted_indices) == 0:
+        return target_found, rgb
+    else:
+        # filter out the detections that are not adopted
+        detections = detections[adopted_indices]
+
+        annotated_image = rgb.copy()
+        BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator(thickness=2)
+        LABEL_ANNOTATOR = sv.LabelAnnotator(text_thickness=2, text_scale=1, text_color=sv.Color.BLACK)
+        annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections)
+        annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections)
+        return target_found, annotated_image
+
+
 
 
 def main(cfg):
@@ -42,83 +101,83 @@ def main(cfg):
     img_width = cfg.img_width
     cam_intr = get_cam_intr(cfg.hfov, img_height, img_width)
 
-    # Load dataset
-    with open(cfg.question_data_path) as f:
-        questions_data = [
-            {k: v for k, v in row.items()}
-            for row in csv.DictReader(f, skipinitialspace=True)
-        ]
-    with open(cfg.init_pose_data_path) as f:
-        init_pose_data = {}
-        for row in csv.DictReader(f, skipinitialspace=True):
-            init_pose_data[row["scene_floor"]] = {
-                "init_pts": [
-                    float(row["init_x"]),
-                    float(row["init_y"]),
-                    float(row["init_z"]),
-                ],
-                "init_angle": float(row["init_angle"]),
-            }
-    logging.info(f"Loaded {len(questions_data)} questions.")
+    random.seed(cfg.seed)
+    np.random.seed(cfg.seed)
+
+    # load object detection model
+    detection_model = YOLOWorld(model_id=cfg.detection_model_name)
 
     # Load VLM
     vlm = VLM(cfg.vlm)
 
+    # Load dataset
+    all_paths_list = os.listdir(cfg.path_data_dir)
+
+    total_questions = 0
+    success_count = 0
+
     # Run all questions
-    cnt_data = 0
-    results_all = []
-    for question_ind in tqdm(range(len(questions_data))):
+    for question_idx in tqdm(range(len(all_paths_list))):
+        total_questions += 1
+        question_id = all_paths_list[question_idx]
+        metadata = json.load(os.path.join(cfg.path_data_dir, question_id, "metadata.json"))
 
         # Extract question
-        question_data = questions_data[question_ind]
-        scene = question_data["scene"]
-        floor = question_data["floor"]
-        scene_floor = scene + "_" + floor
-        question = question_data["question"]
-        choices = question_data["choices"]
-        answer = question_data["answer"]
-        init_pts = init_pose_data[scene_floor]["init_pts"]
-        init_angle = init_pose_data[scene_floor]["init_angle"]
-        logging.info(f"\n========\nIndex: {question_ind} Scene: {scene} Floor: {floor}")
-        logging.info(f"Question: {question} Choices: {choices}, Answer: {answer}")
+        scene_id = metadata["scene"]
+        question = metadata["question"]
+        init_pts = metadata["init_pts"]
+        init_angle = metadata["init_angle"]
+        target_obj_id = metadata["target_obj_id"]
+        target_obj_class = metadata["target_obj_class"]
+        logging.info(f"\n========\nIndex: {question_idx} Scene: {scene_id} Target: {target_obj_class}")
 
-        # Re-format the question to follow LLaMA style
-        vlm_question = question
-        vlm_pred_candidates = ["A", "B", "C", "D"]
-        for token, choice in zip(vlm_pred_candidates, choices):
-            vlm_question += "\n" + token + "." + " " + choice
+        # load scene
+        split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
+        scene_mesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.glb")
+        navmesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
+        semantic_texture_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.glb")
+        scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
+        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path), f'{scene_mesh_path}, {navmesh_path}'
+        assert os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path), f'{semantic_texture_path}, {scene_semantic_annotation_path}'
 
-        # Set data dir for this question - set initial data to be saved
-        episode_data_dir = os.path.join(cfg.output_dir, str(question_ind))
-        os.makedirs(episode_data_dir, exist_ok=True)
-        result = {"question_ind": question_ind}
+        try:
+            del tsdf_planner
+        except:
+            pass
 
         # Set up scene in Habitat
         try:
             simulator.close()
         except:
             pass
-        scene_mesh_dir = os.path.join(
-            cfg.scene_data_path, scene, scene[6:] + ".basis" + ".glb"
-        )
-        navmesh_file = os.path.join(
-            cfg.scene_data_path, scene, scene[6:] + ".basis" + ".navmesh"
-        )
+
         sim_settings = {
-            "scene": scene_mesh_dir,
+            "scene": scene_mesh_path,
             "default_agent": 0,
             "sensor_height": cfg.camera_height,
             "width": img_width,
             "height": img_height,
             "hfov": cfg.hfov,
+            "scene_dataset_config_file": cfg.scene_dataset_config_path,
         }
-        sim_cfg = make_simple_cfg(sim_settings)
+        sim_cfg = make_semantic_cfg(sim_settings)
         simulator = habitat_sim.Simulator(sim_cfg)
         pathfinder = simulator.pathfinder
         pathfinder.seed(cfg.seed)
-        pathfinder.load_nav_mesh(navmesh_file)
+        pathfinder.load_nav_mesh(navmesh_path)
         agent = simulator.initialize_agent(sim_settings["default_agent"])
         agent_state = habitat_sim.AgentState()
+        logging.info(f"Load scene {scene_id} successfully")
+
+        # load semantic object bbox data
+        bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
+        object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
+
+        episode_data_dir = os.path.join(str(cfg.output_dir), str(question_id))
+        episode_frontier_dir = os.path.join(str(cfg.frontier_dir), str(question_id))
+        os.makedirs(episode_data_dir, exist_ok=True)
+        os.makedirs(episode_frontier_dir, exist_ok=True)
+
         pts = init_pts
         angle = init_angle
 
@@ -134,7 +193,10 @@ def main(cfg):
         logging.info(
             f"Scene size: {scene_size} Floor height: {floor_height} Steps: {num_step}"
         )
-
+        try:
+            del tsdf_planner
+        except:
+            pass
         # Initialize TSDF
         tsdf_planner = TSDFPlanner(
             vol_bnds=tsdf_bnds,
@@ -145,6 +207,8 @@ def main(cfg):
         )
 
         # Run steps
+        scene_objects = []
+        target_found = False
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
         for cnt_step in range(num_step):
             logging.info(f"\n== step: {cnt_step}")
@@ -156,7 +220,6 @@ def main(cfg):
             agent_state.rotation = rotation
             agent.set_state(agent_state)
             pts_normal = pos_habitat_to_normal(pts)
-            result[step_name] = {"pts": pts, "angle": angle}
 
             # Update camera info
             sensor = agent.get_state().sensor_states["depth_sensor"]
@@ -172,6 +235,7 @@ def main(cfg):
             obs = simulator.get_sensor_observations()
             rgb = obs["color_sensor"]
             depth = obs["depth_sensor"]
+            semantic_obs = obs["semantic_sensor"]
             if cfg.save_obs:
                 plt.imsave(
                     os.path.join(episode_data_dir, "{}.png".format(cnt_step)), rgb
@@ -180,6 +244,35 @@ def main(cfg):
                 np.sum(rgb, axis=-1) == 0
             )  # sum over channel first
             if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
+                # check whether the target object is observed
+                target_in_view, annotated_rgb = update_scene_graph(
+                    detection_model,
+                    scene_objects,
+                    rgb[..., :3],
+                    semantic_obs,
+                    object_id_to_name,
+                    cfg.scene_graph,
+                    target_obj_id
+                )
+                annotated_rgb = Image.fromarray(annotated_rgb)
+                annotated_rgb.save(
+                    os.path.join(episode_data_dir, f"{cnt_step}_annotated.png")
+                )
+
+                # check stop condition
+                if target_in_view:
+                    if target_obj_id in scene_objects:
+                        target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
+                        if target_obj_pix_ratio > 0:
+                            obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
+                            bias_from_center = (obj_pix_center - np.asarray(
+                                [img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                            # currently just consider that the object should be in around the horizontal center, not the vertical center
+                            # due to the viewing angle difference
+                            if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[
+                                1] < cfg.stop_max_bias_from_center:
+                                logging.info(f"Stop condition met at step {cnt_step}")
+                                target_found = True
 
                 # TSDF fusion
                 tsdf_planner.integrate(
@@ -191,18 +284,7 @@ def main(cfg):
                     margin_h=int(cfg.margin_h_ratio * img_height),
                     margin_w=int(cfg.margin_w_ratio * img_width),
                 )
-
-                # Get VLM prediction
                 rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
-                prompt_question = (
-                    vlm_question
-                    + "\nAnswer with the option's letter from the given choices directly."
-                )
-                # logging.info(f"Prompt Pred: {prompt_text}")
-                smx_vlm_pred = vlm.get_loss(
-                    rgb_im, prompt_question, vlm_pred_candidates
-                )
-                logging.info(f"Pred - Prob: {smx_vlm_pred}")
 
                 # Get VLM relevancy
                 prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view?"
@@ -301,12 +383,15 @@ def main(cfg):
                     )  # voxel locations already saved in tsdf class
 
                 # Save data
-                result[step_name]["smx_vlm_pred"] = smx_vlm_pred
-                result[step_name]["smx_vlm_rel"] = smx_vlm_rel
+                # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
+                # result[step_name]["smx_vlm_rel"] = smx_vlm_rel
             else:
                 logging.info("Skipping black image!")
-                result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+                # result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
+                # result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+
+            if target_found:
+                break
 
             # Determine next point
             if cnt_step < num_step:
@@ -334,51 +419,11 @@ def main(cfg):
                 * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
             ).tolist()
 
-        # Check if success using weighted prediction
-        smx_vlm_all = np.empty((0, 4))
-        relevancy_all = []
-        candidates = ["A", "B", "C", "D"]
-        for step in range(num_step):
-            smx_vlm_pred = result[f"step_{step}"]["smx_vlm_pred"]
-            smx_vlm_rel = result[f"step_{step}"]["smx_vlm_rel"]
-            relevancy_all.append(smx_vlm_rel[0])
-            smx_vlm_all = np.vstack((smx_vlm_all, smx_vlm_rel[0] * smx_vlm_pred))
-        # Option 1: use the max of the weighted predictions
-        smx_vlm_max = np.max(smx_vlm_all, axis=0)
-        pred_token = candidates[np.argmax(smx_vlm_max)]
-        success_weighted = pred_token == answer
-        # Option 2: use the max of the relevancy
-        max_relevancy = np.argmax(relevancy_all)
-        relevancy_ord = np.flip(np.argsort(relevancy_all))
-        pred_token = candidates[np.argmax(smx_vlm_all[max_relevancy])]
-        success_max = pred_token == answer
+        if target_found:
+            success_count += 1
 
-        # Episode summary
-        logging.info(f"\n== Episode Summary")
-        logging.info(f"Scene: {scene}, Floor: {floor}")
-        logging.info(f"Question: {question}, Choices: {choices}, Answer: {answer}")
-        logging.info(f"Success (weighted): {success_weighted}")
-        logging.info(f"Success (max): {success_max}")
-        logging.info(
-            f"Top 3 steps with highest relevancy with value: {relevancy_ord[:3]} {[relevancy_all[i] for i in relevancy_ord[:3]]}"
-        )
-        for rel_ind in range(3):
-            logging.info(f"Prediction: {smx_vlm_all[relevancy_ord[rel_ind]]}")
+        logging.info(f"Success rate: {success_count}/{total_questions} = {success_count / total_questions}")
 
-        # Save data
-        results_all.append(result)
-        cnt_data += 1
-        if cnt_data % cfg.save_freq == 0:
-            with open(
-                os.path.join(cfg.output_dir, f"results_{cnt_data}.pkl"), "wb"
-            ) as f:
-                pickle.dump(results_all, f)
-
-    # Save all data again
-    with open(os.path.join(cfg.output_dir, "results.pkl"), "wb") as f:
-        pickle.dump(results_all, f)
-    logging.info(f"\n== All Summary")
-    logging.info(f"Number of data collected: {cnt_data}")
 
 
 if __name__ == "__main__":
@@ -396,6 +441,9 @@ if __name__ == "__main__":
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
     if not os.path.exists(cfg.output_dir):
         os.makedirs(cfg.output_dir, exist_ok=True)  # recursive
+    cfg.frontier_dir = os.path.join(cfg.output_dir, "frontier")
+    if not os.path.exists(cfg.frontier_dir):
+        os.makedirs(cfg.frontier_dir, exist_ok=True)  # recursive
     logging_path = os.path.join(cfg.output_dir, "log.log")
     logging.basicConfig(
         level=logging.INFO,
