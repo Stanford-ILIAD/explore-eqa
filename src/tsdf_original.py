@@ -693,7 +693,7 @@ class TSDFPlanner:
                 pts_angle = np.arctan2(normal[1], normal[0]) - np.pi / 2
                 weight *= np.exp(-dist / dist_T)
                 if (
-                    dist < min_dist_from_cur / self._voxel_size
+                    dist < min_dist_from_cur
                     and np.abs(angle - pts_angle) < np.pi / 6
                 ):
                     weight *= 1e-3
@@ -806,23 +806,29 @@ class TSDFPlanner:
 
         # Plot
         fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
+        agent_orientation = self.rad2vector(angle)
         ax1.imshow(unoccupied)
         ax1.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
         ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
+        ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
         ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
         ax1.set_title("Unoccupied")
+
         ax2.imshow(island)
         ax2.set_title("Island")
+
         ax3.imshow(unexplored_neighbors)
         for point in frontiers_pre_cluster:
             ax3.scatter(point[1], point[0], color="white", s=20, alpha=1)
         ax3.set_title("Unexplored neighbors")
+
         im = ax4.imshow(val_vol_2d)
         for point in frontiers:
             ax4.scatter(point[1], point[0], color="white", s=20, alpha=1)
         fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
         ax4.scatter(max_point[1], max_point[0], c="r", s=30, label="max")
         ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
+        ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
         ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
         ax4.quiver(
             next_point[1],
@@ -835,8 +841,10 @@ class TSDFPlanner:
             alpha=0.2,
         )
         ax4.set_title("Current sem values")
+
         im = ax5.imshow(island)
         ax5.set_title("Path on island")
+
         frontier_weights = np.zeros_like(val_vol_2d)
         for point, weight in zip(frontiers, frontiers_weight):
             frontier_weights[point[0], point[1]] = weight
@@ -960,3 +968,7 @@ class TSDFPlanner:
             if random.random() < 0.5:
                 direction *= -1
         return direction
+
+    @staticmethod
+    def rad2vector(angle):
+        return np.array([-np.sin(angle), np.cos(angle)])

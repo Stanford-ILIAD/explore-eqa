@@ -35,7 +35,7 @@ from src.habitat import (
 )
 from src.geom import get_cam_intr, get_scene_bnds, IoU
 from src.vlm import VLM
-from src.tsdf import TSDFPlanner
+from src.tsdf_original import TSDFPlanner
 
 
 def update_scene_graph(detection_model, scene_objects, rgb, semantic_obs, obj_id_to_name, cfg, target_obj_id):
@@ -120,7 +120,7 @@ def main(cfg):
     for question_idx in tqdm(range(len(all_paths_list))):
         total_questions += 1
         question_id = all_paths_list[question_idx]
-        metadata = json.load(os.path.join(cfg.path_data_dir, question_id, "metadata.json"))
+        metadata = json.load(open(os.path.join(cfg.path_data_dir, question_id, "metadata.json"), "r"))
 
         # Extract question
         scene_id = metadata["scene"]
@@ -173,6 +173,11 @@ def main(cfg):
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
 
+        obj_bbox = [item['bbox'] for item in bounding_box_data if int(item['id']) == target_obj_id][0]
+        obj_bbox = np.asarray(obj_bbox)  # (2, 3)
+        obj_bbox_center = np.mean(obj_bbox, axis=0)
+        obj_bbox_center = obj_bbox_center[[0, 2, 1]]
+
         episode_data_dir = os.path.join(str(cfg.output_dir), str(question_id))
         episode_frontier_dir = os.path.join(str(cfg.frontier_dir), str(question_id))
         os.makedirs(episode_data_dir, exist_ok=True)
@@ -205,6 +210,8 @@ def main(cfg):
             pts_init=pos_habitat_to_normal(pts),
             init_clearance=cfg.init_clearance * 2,
         )
+
+        target_center_voxel = tsdf_planner.world2vox(pos_habitat_to_normal(obj_bbox_center))
 
         # Run steps
         scene_objects = []
@@ -409,6 +416,15 @@ def main(cfg):
                 ax5 = fig.axes[4]
                 ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
                 ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
+
+                # add target object bbox
+                color = 'green' if target_obj_id in scene_objects else 'red'
+                ax5.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
+                ax1, ax2, ax4 = fig.axes[0], fig.axes[1], fig.axes[3]
+                ax4.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
+                ax1.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
+                ax2.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
+
                 fig.tight_layout()
                 plt.savefig(
                     os.path.join(episode_data_dir, "{}_map.png".format(cnt_step + 1))
