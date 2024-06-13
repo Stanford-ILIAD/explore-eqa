@@ -123,21 +123,6 @@ def main(cfg):
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
-        #
-        # # Load the semantic annotation
-        # obj_id_to_class = {}
-        # obj_id_to_room_id = {}
-        # with open(scene_semantic_annotation_path, "r") as f:
-        #     for line in f.readlines():
-        #         if 'HM3D Semantic Annotations' in line:  # skip the first line
-        #             continue
-        #         line = line.strip().split(',')
-        #         idx = int(line[0])
-        #         class_name = line[2].replace("\"", "")
-        #         room_id = int(line[3])
-        #         obj_id_to_class[idx] = class_name
-        #         obj_id_to_room_id[idx] = room_id
-        # obj_id_to_class[0] = 'unannotated'
 
         for question_data in all_questions_in_scene:
             target_obj_id = question_data['object_id']
@@ -194,7 +179,9 @@ def main(cfg):
             # run steps
             target_found = False
             num_step = int(travel_dist * cfg.max_step_dist_ratio)
-            for cnt_step in range(num_step):
+            cnt_step = -1
+            while cnt_step < num_step - 1:
+                cnt_step += 1
                 logging.info(f"\n== step: {cnt_step}")
 
                 # for each position, get the views from different angles
@@ -216,7 +203,7 @@ def main(cfg):
 
                 # observe and update the TSDF
                 for view_idx, ang in enumerate(all_angles):
-                    logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+                    # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
 
                     # check whether current view is valid
                     collision_dist = tsdf_planner._voxel_size * get_collision_distance(
@@ -225,7 +212,7 @@ def main(cfg):
                         direction=tsdf_planner.rad2vector(ang)
                     )
                     if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
-                        logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                        # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
                         continue
 
                     agent_state.position = pts
@@ -254,10 +241,11 @@ def main(cfg):
                     black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
                     if black_pix_ratio > cfg.black_pixel_ratio:
                         keep_observation = False
-                    if np.percentile(depth[depth > 0], 30) < cfg.min_30_percentile_depth:
+                    positive_depth = depth[depth > 0]
+                    if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
                         keep_observation = False
-                    if not keep_observation:
-                        logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                    if not keep_observation and view_idx != total_views - 1:
+                        # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
                         continue
 
                     # construct an frequency count map of each semantic id to a unique id
@@ -316,8 +304,12 @@ def main(cfg):
                 if target_found:
                     break
 
+                if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                    # if the target object is in the scene graph, give more steps to allow slowly moving to the target
+                    num_step = int(travel_dist * (cfg.max_step_dist_ratio + 0.5))
+
                 # determine the next point and move the agent
-                pts_normal, angle, pts_pix, fig, path_points = tsdf_planner.find_next_pose_with_path(
+                return_values = tsdf_planner.find_next_pose_with_path(
                     pts=pts_normal,
                     angle=angle,
                     path_points=path_points,
@@ -325,9 +317,14 @@ def main(cfg):
                     target_obj_id=target_obj_id,
                     cfg=cfg.planner
                 )
+                if return_values[0] is None:
+                    logging.info(f"Question id {question_data['question_id']} invalid!")
+                    break
+
+                pts_normal, angle, pts_pix, fig, path_points = return_values
                 if cfg.save_frontier:
                     # Turn to face each frontier point and get rgb image
-                    print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
+                    # print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
                     for i, frontier in enumerate(tsdf_planner.frontiers):
                         pos_voxel = frontier.position
                         pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
@@ -339,9 +336,9 @@ def main(cfg):
                                 os.system(f"cp {original_path} {target_path}")
                         else:
                             view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                            if np.linalg.norm(view_frontier_direction) < 1e-3:
-                                continue
                             default_view_direction = np.asarray([0., 0., -1.])
+                            if np.linalg.norm(view_frontier_direction) < 1e-3:
+                                view_frontier_direction = default_view_direction
                             if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
                                 # if the rotation is to rotate 180 degree, then the quaternion is not unique
                                 # we need to specify rotating along y-axis
@@ -371,9 +368,7 @@ def main(cfg):
                 ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
                 ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
                 fig.tight_layout()
-                plt.savefig(
-                    os.path.join(episode_data_dir, "{}_map.png".format(cnt_step))
-                )
+                plt.savefig(os.path.join(episode_data_dir, "{}_map.png".format(cnt_step)))
                 plt.close()
 
                 # update position and rotation
