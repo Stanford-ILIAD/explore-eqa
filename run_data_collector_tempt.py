@@ -378,7 +378,10 @@ def main(cfg):
                     #
                     # pts_normal, angle, pts_pix, fig, path_points, max_point_choice = return_values
 
-                    tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
+                    update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
+                    if not update_success:
+                        logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid: update frontier map failed!")
+                        break
 
                     max_point_choice = tsdf_planner.get_next_choice(
                         pts=pts_normal,

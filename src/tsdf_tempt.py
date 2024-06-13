@@ -154,7 +154,6 @@ class TSDFPlanner:
             self._vol_dim[:2],
         )
 
-        self.target_point = None
         self.target_direction = None
         self.max_point = None
         self.simple_scene_graph = {}
@@ -668,7 +667,7 @@ class TSDFPlanner:
             for frontier in self.frontiers:
                 # find normal of the frontier
                 normal = frontier.orientation
-                
+
                 # Then check how much unoccupied in that direction
                 max_pixel_check = int(cfg.max_unoccupied_check_frontier / self._voxel_size)
                 dir_pts = np.round(
@@ -690,11 +689,11 @@ class TSDFPlanner:
                     np.sum(self.unexplored[dir_pts[:, 0], dir_pts[:, 1]] == 1)
                     / max_pixel_check
                 )
-                
+
                 # get weight for path points
                 pos_world = frontier.position * self._voxel_size + self._vol_origin[:2]
                 closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal, pathfinder, pts[2])
-                
+
                 # Get weight - unexplored, unoccupied, and value
                 weight = np.exp(unexplored_rate / cfg.unexplored_T)  # [0-1] before T
                 weight *= np.exp(unoccupied_rate / cfg.unoccupied_T)  # [0-1] before T
@@ -702,7 +701,7 @@ class TSDFPlanner:
                 # add weight for path points
                 weight *= np.exp(- closest_dist) * 3
                 weight *= np.exp(cosine_dist)
-                
+
                 # Check distance to current point - make weight very small if too close and aligned
                 dist = np.sqrt((cur_point[0] - frontier.position[0]) ** 2 + (cur_point[1] - frontier.position[1]) ** 2)
                 pts_angle = np.arctan2(normal[1], normal[0]) - np.pi / 2
@@ -712,16 +711,16 @@ class TSDFPlanner:
                     and np.abs(angle - pts_angle) < np.pi / 6
                 ):
                     weight *= 1e-3
-                    
+
                 # if the frontier is visited before, ignore it
                 if frontier.visited:
                     weight *= 1e-3
-                
+
                 # Save weight
                 frontiers_weight = np.append(frontiers_weight, weight)
             logging.info(f"Number of frontiers for next pose: {len(self.frontiers)}")
             self.frontiers_weight = frontiers_weight
-            
+
             # choose the frontier with highest weight
             if len(self.frontiers) > 0:
                 frontier_ind = np.argmax(frontiers_weight)
@@ -742,7 +741,8 @@ class TSDFPlanner:
         save_visualization=True,
     ):
         cur_point = self.world2vox(pts)
-        
+        max_point = choice
+
         if type(choice) == Object:
             target_point = choice.position
             # # set the object center as the navigation target
@@ -754,22 +754,18 @@ class TSDFPlanner:
                 # a wierd case that no unoccupied point is found in all the space
                 logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
                 return (None,)
-            self.target_point = target_navigable_point
-            next_point = self.target_point.copy()
-            max_point = choice
+            next_point = target_navigable_point
         elif type(choice) == Frontier:
-            max_point = choice
-            
             # find the direction into unexplored
             ft_direction = max_point.orientation
-            
-            # this try not backtrack
+
+            # find an unoccupied point between the agent and the frontier
             next_point = np.array(max_point.position, dtype=float)
             try_count = 0
             while (
-                self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))] or
-                not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))] or
-                not self.check_within_bnds(next_point)
+                not self.check_within_bnds(next_point.astype(int)) or
+                self.occupied[int(next_point[0]), int(next_point[1])] or
+                not self.island[int(next_point[0]), int(next_point[1])]
             ):
                 next_point -= ft_direction
                 try_count += 1
@@ -777,14 +773,17 @@ class TSDFPlanner:
                     logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point")
                     return (None,)
             
-            next_point = np.round(next_point).astype(int)
+            next_point = next_point.astype(int)
+        else:
+            logging.error(f"Error in find_next_pose_with_path: wrong choice type: {type(choice)}")
+            return (None,)
         
         # check the distance to next navigation point
         # if the target navigation point is too far
         # then just go to a point between the current point and the target point
-        max_dist_from_cur = cfg.max_dist_from_cur_phase_1 if self.target_point is None else cfg.max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
+        max_dist_from_cur = cfg.max_dist_from_cur_phase_1 if type(max_point) == Frontier else cfg.max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
         dist, path_to_target = self.get_distance(cur_point[:2], next_point, height=pts[2], pathfinder=pathfinder)
-        
+
         if dist > max_dist_from_cur:
             if path_to_target is not None:
                 # drop the y value of the path to avoid errors when calculating seg_length
@@ -813,10 +812,10 @@ class TSDFPlanner:
                 ):
                     next_point -= walk_dir * 0.3 / self._voxel_size
                 next_point = np.round(next_point).astype(int)
-        
+
         next_point_old = next_point.copy()
         next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
-        
+
         # determine the direction: from next point to max point
         if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
             # this case should not happen actually, since the exploration should end before this
@@ -829,11 +828,11 @@ class TSDFPlanner:
             # normal direction from next point to max point
             direction = max_point.position - next_point
         direction = direction / np.linalg.norm(direction)
-        
+
         # mark the max point as visited if it is a frontier
         if type(max_point) == Frontier:
             max_point.visited = True
-        
+
         # Plot
         fig = None
         if save_visualization:
@@ -850,7 +849,7 @@ class TSDFPlanner:
                 obj_vox = self.habitat2voxel(obj_center)
                 ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
             # plot the target point if found
-            if self.target_point is not None:
+            if type(max_point) == Object:
                 ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
@@ -913,7 +912,7 @@ class TSDFPlanner:
             fig.colorbar(im, orientation="vertical", ax=ax6, fraction=0.046, pad=0.04)
             # ax6.scatter(max_point[1], max_point[0], c="r", s=20, label="max")
             ax6.set_title("Frontier weights")
-        
+
         # Convert back to world coordinates
         next_point_normal = next_point * self._voxel_size + self._vol_origin[:2]
 
@@ -922,21 +921,10 @@ class TSDFPlanner:
 
         # update the path points
         updated_path_points = self.update_path_points(path_points, next_point_normal)
-        
+
         return next_point_normal, next_yaw, next_point, fig, updated_path_points
-            
-            
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
+
+
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""
