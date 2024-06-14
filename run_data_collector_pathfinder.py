@@ -34,7 +34,6 @@ from src.habitat import (
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf import TSDFPlanner, Frontier, Object
-from habitat_sim.utils.common import d3_40_colors_rgb
 from inference.models import YOLOWorld
 
 

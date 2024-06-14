@@ -33,66 +33,18 @@ from src.habitat import (
     get_quaternion,
     get_navigable_point_to
 )
-from src.geom import get_cam_intr, get_scene_bnds, IoU
+from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.vlm import VLM
-from src.tsdf_original import TSDFPlanner
+from src.tsdf_original_2 import TSDFPlanner, Frontier, Object
+from inference.models import YOLOWorld
 
 
-def update_scene_graph(detection_model, scene_objects, rgb, semantic_obs, obj_id_to_name, cfg, target_obj_id):
-    target_found = False
 
-    unique_obj_ids = np.unique(semantic_obs)
-    class_to_obj_id = {}
-    for obj_id in unique_obj_ids:
-        if obj_id == 0 or obj_id not in obj_id_to_name.keys() or obj_id_to_name[obj_id] in ['wall', 'floor', 'ceiling']:
-            continue
-        if obj_id_to_name[obj_id] not in class_to_obj_id.keys():
-            class_to_obj_id[obj_id_to_name[obj_id]] = [obj_id]
-        else:
-            class_to_obj_id[obj_id_to_name[obj_id]].append(obj_id)
-    all_classes = list(class_to_obj_id.keys())
-
-    if len(all_classes) == 0:
-        return target_found, rgb
-
-    detection_model.set_classes(all_classes)
-
-    results = detection_model.infer(rgb, confidence=cfg.confidence)
-    detections = sv.Detections.from_inference(results).with_nms(threshold=cfg.nms_threshold)
-
-    adopted_indices = []
-    for i in range(len(detections)):
-        class_name = all_classes[detections.class_id[i]]
-        x_start, y_start, x_end, y_end = detections.xyxy[i].astype(int)
-        bbox_mask = np.zeros(semantic_obs.shape, dtype=bool)
-        bbox_mask[y_start:y_end, x_start:x_end] = True
-        for obj_id in class_to_obj_id[class_name]:
-            obj_x_start, obj_y_start = np.argwhere(semantic_obs == obj_id).min(axis=0)
-            obj_x_end, obj_y_end = np.argwhere(semantic_obs == obj_id).max(axis=0)
-            obj_mask = np.zeros(semantic_obs.shape, dtype=bool)
-            obj_mask[obj_x_start:obj_x_end, obj_y_start:obj_y_end] = True
-            if IoU(bbox_mask, obj_mask) > cfg.iou_threshold:
-                if obj_id not in scene_objects:
-                    scene_objects.append(obj_id)
-                adopted_indices.append(i)
-                if obj_id == target_obj_id:
-                    target_found = True
-                break
-
-    if len(adopted_indices) == 0:
-        return target_found, rgb
-    else:
-        # filter out the detections that are not adopted
-        detections = detections[adopted_indices]
-
-        annotated_image = rgb.copy()
-        BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator(thickness=2)
-        LABEL_ANNOTATOR = sv.LabelAnnotator(text_thickness=2, text_scale=1, text_color=sv.Color.BLACK)
-        annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections)
-        annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections)
-        return target_found, annotated_image
-
-
+def get_info(pathfinder, pos):
+    is_navigable = pathfinder.is_navigable(pos)
+    hit_record = pathfinder.closest_obstacle_surface_point(pos, 0.5)
+    dist = hit_record.hit_dist
+    return is_navigable, dist
 
 
 def main(cfg):
@@ -171,6 +123,7 @@ def main(cfg):
 
         # load semantic object bbox data
         bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
+        object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
 
         obj_bbox = [item['bbox'] for item in bounding_box_data if int(item['id']) == target_obj_id][0]
@@ -214,7 +167,6 @@ def main(cfg):
         target_center_voxel = tsdf_planner.world2vox(pos_habitat_to_normal(obj_bbox_center))
 
         # Run steps
-        scene_objects = []
         target_found = False
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
         for cnt_step in range(num_step):
@@ -251,15 +203,16 @@ def main(cfg):
                 np.sum(rgb, axis=-1) == 0
             )  # sum over channel first
             if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
-                # check whether the target object is observed
-                target_in_view, annotated_rgb = update_scene_graph(
-                    detection_model,
-                    scene_objects,
-                    rgb[..., :3],
-                    semantic_obs,
-                    object_id_to_name,
-                    cfg.scene_graph,
-                    target_obj_id
+                # update the scene graph
+                target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
+                    detection_model=detection_model,
+                    rgb=rgb[..., :3],
+                    semantic_obs=semantic_obs,
+                    obj_id_to_name=object_id_to_name,
+                    obj_id_to_bbox=object_id_to_bbox,
+                    cfg=cfg.scene_graph,
+                    target_obj_id=target_obj_id,
+                    return_annotated=True
                 )
                 annotated_rgb = Image.fromarray(annotated_rgb)
                 annotated_rgb.save(
@@ -268,16 +221,14 @@ def main(cfg):
 
                 # check stop condition
                 if target_in_view:
-                    if target_obj_id in scene_objects:
+                    if target_obj_id in tsdf_planner.simple_scene_graph.keys():
                         target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
                         if target_obj_pix_ratio > 0:
                             obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
-                            bias_from_center = (obj_pix_center - np.asarray(
-                                [img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                            bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
                             # currently just consider that the object should be in around the horizontal center, not the vertical center
                             # due to the viewing angle difference
-                            if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[
-                                1] < cfg.stop_max_bias_from_center:
+                            if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
                                 logging.info(f"Stop condition met at step {cnt_step}")
                                 target_found = True
 
@@ -401,24 +352,29 @@ def main(cfg):
                 break
 
             # Determine next point
-            if cnt_step < num_step:
-                pts_normal, angle, pts_pix, fig = tsdf_planner.find_next_pose(
-                    pts=pts_normal,
-                    angle=angle,
-                    flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
-                    **cfg.planner,
-                )
-                pts_pixs = np.vstack((pts_pixs, pts_pix))
-                pts_normal = np.append(pts_normal, floor_height)
-                pts = pos_normal_to_habitat(pts_normal)
+            return_values = tsdf_planner.find_next_pose_with_path(
+                pts=pts_normal,
+                angle=angle,
+                pathfinder=pathfinder,
+                cfg=cfg.planner,
+                flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
+                save_visualization=cfg.save_visualization,
+            )
+            if return_values[0] is None:
+                logging.info(f"Question invalid!")
+                break
 
+            pts_normal, angle, pts_pix, fig = return_values
+
+            pts_pixs = np.vstack((pts_pixs, pts_pix))
+            if cfg.save_visualization:
                 # Add path to ax5, with colormap to indicate order
                 ax5 = fig.axes[4]
                 ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
                 ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
 
                 # add target object bbox
-                color = 'green' if target_obj_id in scene_objects else 'red'
+                color = 'green' if target_obj_id in tsdf_planner.simple_scene_graph.keys() else 'red'
                 ax5.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
                 ax1, ax2, ax4 = fig.axes[0], fig.axes[1], fig.axes[3]
                 ax4.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
@@ -426,14 +382,12 @@ def main(cfg):
                 ax2.scatter(target_center_voxel[1], target_center_voxel[0], c=color, s = 120)
 
                 fig.tight_layout()
-                plt.savefig(
-                    os.path.join(episode_data_dir, "{}_map.png".format(cnt_step + 1))
-                )
+                plt.savefig(os.path.join(episode_data_dir, "{}_map.png".format(cnt_step)))
                 plt.close()
-            rotation = quat_to_coeffs(
-                quat_from_angle_axis(angle, np.array([0, 1, 0]))
-                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-            ).tolist()
+
+            pts_normal = np.append(pts_normal, floor_height)
+            pts = pos_normal_to_habitat(pts_normal)
+            rotation = get_quaternion(angle, camera_tilt)
 
         if target_found:
             success_count += 1

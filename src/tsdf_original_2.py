@@ -672,13 +672,10 @@ class TSDFPlanner:
         self,
         pts,
         angle,
-        path_points,
         pathfinder,
-        target_obj_id,
         cfg,
         flag_no_val_weight=False,
         save_visualization=True,
-        return_choice=False,
         **kwargs,
     ):
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
@@ -834,24 +831,12 @@ class TSDFPlanner:
                     self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                 )
 
+        if len(self.frontiers) == 0:
+            logging.error(f'Error in find_next_pose_with_path: frontier size is 0')
+            return (None,)
+
         # subsample
         frontiers_weight = np.zeros((len(self.frontiers)))
-
-        # determine whether the target object is in scene graph
-        if target_obj_id in self.simple_scene_graph.keys():
-            target_point = self.habitat2voxel(self.simple_scene_graph[target_obj_id])[:2]
-            # # set the object center as the navigation target
-            # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
-            # since it's not proper to directly go to the target point,
-            # we'd better find a navigable point that is certain distance from it to better observe the target
-            target_navigable_point = get_proper_observe_point(target_point, unoccupied, cur_point=cur_point , dist=cfg.final_observe_distance / self._voxel_size)
-            if target_navigable_point is None:
-                # a wierd case that no unoccupied point is found in all the space
-                logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
-                return (None,)
-            self.target_point = target_navigable_point
-            self.max_point = Object(target_point.astype(int), target_obj_id)
-            logging.info(f"Target point found: {target_point}")
 
         # if target point is not found, find the next frontier
         if self.target_point is None:
@@ -885,35 +870,27 @@ class TSDFPlanner:
                 )
 
                 # Check value in the direction
-                # max_pixel_check = int(max_val_check_frontier / self._voxel_size)
-                # dir_pts = np.round(
-                #     point + np.arange(max_pixel_check)[:, np.newaxis] * normal
-                # ).astype(int)
-                # dir_pts = self.clip_2d_array(dir_pts)
-                # val_vol_2d_dir = val_vol_2d[dir_pts[:, 0], dir_pts[:, 1]]
-                # # keep non zero value only
-                # val_vol_2d_dir = val_vol_2d_dir[val_vol_2d_dir > 0]
-                # if len(val_vol_2d_dir) == 0:
-                #     val = 0
-                # else:
-                #     val = np.mean(val_vol_2d_dir)
-
-                # get weight for path points
-                pos_world = frontier.position * self._voxel_size + self._vol_origin[:2]
-                closest_dist, cosine_dist = self.get_closest_distance(path_points, pos_world, normal, pathfinder, pts[2])
+                max_pixel_check = int(cfg.max_val_check_frontier / self._voxel_size)
+                dir_pts = np.round(
+                    frontier.position + np.arange(max_pixel_check)[:, np.newaxis] * normal
+                ).astype(int)
+                dir_pts = self.clip_2d_array(dir_pts)
+                val_vol_2d_dir = val_vol_2d[dir_pts[:, 0], dir_pts[:, 1]]
+                # keep non zero value only
+                val_vol_2d_dir = val_vol_2d_dir[val_vol_2d_dir > 0]
+                if len(val_vol_2d_dir) == 0:
+                    val = 0
+                else:
+                    val = np.mean(val_vol_2d_dir)
 
                 # Get weight - unexplored, unoccupied, and value
                 weight = np.exp(unexplored_rate / cfg.unexplored_T)  # [0-1] before T
                 weight *= np.exp(unoccupied_rate / cfg.unoccupied_T)  # [0-1] before T
-                # if not flag_no_val_weight:
-                #     weight *= np.exp(
-                #         val_vol_2d[point[0], point[1]] / val_T
-                #     )  # [0-1] before T
-                #     weight *= np.exp(val / val_dir_T)  # [0-1] before T
-
-                # add weight for path points
-                weight *= np.exp(- closest_dist) * 3
-                weight *= np.exp(cosine_dist)
+                if not flag_no_val_weight:
+                    weight *= np.exp(
+                        val_vol_2d[frontier.position[0], frontier.position[1]] / cfg.val_T
+                    )  # [0-1] before T
+                    weight *= np.exp(val / cfg.val_dir_T)  # [0-1] before T
 
                 # Check distance to current point - make weight very small if too close and aligned
                 dist = np.sqrt((cur_point[0] - frontier.position[0]) ** 2 + (cur_point[1] - frontier.position[1]) ** 2)
@@ -956,12 +933,10 @@ class TSDFPlanner:
                     frontiers_weight_red = frontiers_weight / np.mean(
                         frontiers_weight
                     )  # prevent overflowing
-                    # change from random choose to choose the max weight
-                    # frontier_ind = np.random.choice(
-                    #     range(len(frontiers)),
-                    #     p=frontiers_weight_red / np.sum(frontiers_weight_red),
-                    # )
-                    frontier_ind = np.argmax(frontiers_weight)
+                    frontier_ind = np.random.choice(
+                        range(len(self.frontiers)),
+                        p=frontiers_weight_red / np.sum(frontiers_weight_red),
+                    )
                     logging.info(f"weight: {frontiers_weight[frontier_ind]:.3f}")
                     max_point = self.frontiers[frontier_ind]
 
@@ -1128,11 +1103,6 @@ class TSDFPlanner:
             for frontier, weight in zip(self.frontiers, frontiers_weight):
                 frontier_weights[frontier.position[0], frontier.position[1]] = weight
             im = ax6.imshow(frontier_weights)
-            # draw path points
-            for i_pp in range(len(path_points) - 1):
-                p1 = (path_points[i_pp] - self._vol_origin[:2]) / self._voxel_size
-                p2 = (path_points[i_pp + 1] - self._vol_origin[:2]) / self._voxel_size
-                ax6.arrow(p1[1], p1[0], p2[1] - p1[1], p2[0] - p1[0], color="r", width=0.1, head_width=0.8, head_length=0.8)
 
             fig.colorbar(im, orientation="vertical", ax=ax6, fraction=0.046, pad=0.04)
             # ax6.scatter(max_point[1], max_point[0], c="r", s=20, label="max")
@@ -1143,14 +1113,7 @@ class TSDFPlanner:
 
         # Find the yaw angle again
         next_yaw = np.arctan2(direction[1], direction[0]) - np.pi / 2
-
-        # update the path points
-        updated_path_points = self.update_path_points(path_points, next_point_normal)
-
-        if not return_choice:
-            return next_point_normal, next_yaw, next_point, fig, updated_path_points
-        else:
-            return next_point_normal, next_yaw, next_point, fig, updated_path_points, max_point
+        return next_point_normal, next_yaw, next_point, fig
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""
