@@ -15,7 +15,7 @@ save_freq: 10
 vlm:
   hf_token:
   device: cuda
-  model_id: prism-dinosiglip+7b
+  model_id: prism-dinosiglip+13b
   cache_dir: '/gpfs/u/home/LMCG/LMCGnngn/scratch/yanghan/cache/'
 
 # Camera, image
