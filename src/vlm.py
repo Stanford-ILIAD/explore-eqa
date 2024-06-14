@@ -10,6 +10,7 @@ class VLM:
         start_time = time.time()
         self.model = load(cfg.model_id, hf_token=cfg.hf_token, cache_dir=cfg.cache_dir)
         self.model.to(cfg.device, dtype=torch.bfloat16)
+        self.model.llm_backbone.half_precision_dtype = torch.float32
         logging.info(f"Loaded VLM in {time.time() - start_time:.3f}s")
 
     def generate(self, prompt, image, T=0.4, max_tokens=512):
