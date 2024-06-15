@@ -332,12 +332,13 @@ def main(cfg):
                     prompt = f"Consider the question: {question}, and you will explore the area in the image. Is the direction in the image worth exploring for answering the question? Answer with Yes or No."
                     frontier.score = vlm.get_loss(rgb_im, prompt, ["Yes", "No"])[0]
 
-                    # write the question and score on the image
-                    draw = ImageDraw.Draw(rgb_im)
-                    font = ImageFont.load_default()
-                    draw.text((10, 10), f"Question: {question}", (255, 255, 255), font=font)
-                    draw.text((10, 30), f"Score: {frontier.score}", (255, 255, 255), font=font)
-                    rgb_im.save(os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"))
+                    if cfg.save_frontier:
+                        # write the question and score on the image
+                        draw = ImageDraw.Draw(rgb_im)
+                        font = ImageFont.load_default()
+                        draw.text((10, 10), f"Question: {question}", (255, 255, 255), font=font)
+                        draw.text((10, 30), f"Score: {frontier.score}", (255, 255, 255), font=font)
+                        rgb_im.save(os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"))
 
             max_point_choice = tsdf_planner.get_next_choice(
                 pts=pts_normal,
