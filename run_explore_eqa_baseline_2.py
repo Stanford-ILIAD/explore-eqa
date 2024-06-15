@@ -328,8 +328,9 @@ def main(cfg):
                     frontier.image = f"{cnt_step}_{i}.png"
 
                     # Get score from VLM using rgb
+                    rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
                     prompt = f"Consider the question: {question}, and you will explore the area in the image. Is the direction in the image worth exploring for answering the question? Answer with Yes or No."
-                    frontier.score = vlm.get_loss(rgb, prompt, ["Yes", "No"])[0]
+                    frontier.score = vlm.get_loss(rgb_im, prompt, ["Yes", "No"])[0]
 
             max_point_choice = tsdf_planner.get_next_choice(
                 pts=pts_normal,
