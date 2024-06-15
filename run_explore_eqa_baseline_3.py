@@ -305,7 +305,6 @@ def main(cfg):
                     if os.path.exists(original_path):
                         target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png")
                         os.system(f"cp {original_path} {target_path}")
-                    assert frontier.score != 0, f'{frontier.image}, {frontier.score}'
                 else:
                     view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
                     default_view_direction = np.asarray([0., 0., -1.])
