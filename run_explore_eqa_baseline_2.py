@@ -19,8 +19,6 @@ import quaternion
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
-from inference.models import YOLOWorld
-import supervision as sv
 import habitat_sim
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
@@ -140,10 +138,8 @@ def main(cfg):
         angle = init_angle
 
         # Floor - use pts height as floor height
-        rotation = quat_to_coeffs(
-            quat_from_angle_axis(angle, np.array([0, 1, 0]))
-            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-        ).tolist()
+        rotation = get_quaternion(angle, camera_tilt)
+
         pts_normal = pos_habitat_to_normal(pts)
         floor_height = pts_normal[-1]
         tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
@@ -165,45 +161,81 @@ def main(cfg):
         )
 
         target_center_voxel = tsdf_planner.world2vox(pos_habitat_to_normal(obj_bbox_center))
+        pts_pixs = np.empty((0, 2))  # for plotting path on the image
+        pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(pts)[:2]))
 
         # Run steps
         target_found = False
-        pts_pixs = np.empty((0, 2))  # for plotting path on the image
-        for cnt_step in range(num_step):
+        cnt_step = -1
+        while cnt_step < num_step - 1:
+            cnt_step += 1
             logging.info(f"\n== step: {cnt_step}")
 
-            # Save step info and set current pose
-            step_name = f"step_{cnt_step}"
-            logging.info(f"Current pts: {pts}")
-            agent_state.position = pts
-            agent_state.rotation = rotation
-            agent.set_state(agent_state)
-            pts_normal = pos_habitat_to_normal(pts)
+            # for each position, get the views from different angles
+            if target_obj_id in tsdf_planner.simple_scene_graph.keys():
+                angle_increment = cfg.extra_view_angle_deg_phase_2 * np.pi / 180
+                total_views = 1 + cfg.extra_view_phase_2
+            else:
+                angle_increment = cfg.extra_view_angle_deg_phase_1 * np.pi / 180
+                total_views = 1 + cfg.extra_view_phase_1
+            all_angles = [angle + angle_increment * (i - total_views // 2) for i in range(total_views)]
+            # let the main viewing angle be the last one to avoid potential overwriting problems
+            main_angle = all_angles.pop(total_views // 2)
+            all_angles.append(main_angle)
 
-            # Update camera info
-            sensor = agent.get_state().sensor_states["depth_sensor"]
-            quaternion_0 = sensor.rotation
-            translation_0 = sensor.position
-            cam_pose = np.eye(4)
-            cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
-            cam_pose[:3, 3] = translation_0
-            cam_pose_normal = pose_habitat_to_normal(cam_pose)
-            cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
+            unoccupied_map, _ = tsdf_planner.get_island_around_pts(
+                pts_normal, height=1.2
+            )
+            occupied_map = np.logical_not(unoccupied_map)
 
-            # Get observation at current pose - skip black image, meaning robot is outside the floor
-            obs = simulator.get_sensor_observations()
-            rgb = obs["color_sensor"]
-            depth = obs["depth_sensor"]
-            semantic_obs = obs["semantic_sensor"]
-            if cfg.save_obs:
-                plt.imsave(
-                    os.path.join(episode_data_dir, "{}.png".format(cnt_step)), rgb
+            # observe and update the TSDF
+            for view_idx, ang in enumerate(all_angles):
+            # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+
+                # check whether current view is valid
+                collision_dist = tsdf_planner._voxel_size * get_collision_distance(
+                    occupied_map,
+                    pos=tsdf_planner.habitat2voxel(pts),
+                    direction=tsdf_planner.rad2vector(ang)
                 )
-            num_black_pixels = np.sum(
-                np.sum(rgb, axis=-1) == 0
-            )  # sum over channel first
-            if num_black_pixels < cfg.black_pixel_ratio * img_width * img_height:
-                # update the scene graph
+                if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
+                    # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                    continue
+
+                agent_state.position = pts
+                agent_state.rotation = get_quaternion(ang, camera_tilt)
+                agent.set_state(agent_state)
+                pts_normal = pos_habitat_to_normal(pts)
+
+                # Update camera info
+                sensor = agent.get_state().sensor_states["depth_sensor"]
+                quaternion_0 = sensor.rotation
+                translation_0 = sensor.position
+                cam_pose = np.eye(4)
+                cam_pose[:3, :3] = quaternion.as_rotation_matrix(quaternion_0)
+                cam_pose[:3, 3] = translation_0
+                cam_pose_normal = pose_habitat_to_normal(cam_pose)
+                cam_pose_tsdf = pose_normal_to_tsdf(cam_pose_normal)
+
+                # Get observation at current pose - skip black image, meaning robot is outside the floor
+                obs = simulator.get_sensor_observations()
+                rgb = obs["color_sensor"]
+                depth = obs["depth_sensor"]
+                semantic_obs = obs["semantic_sensor"]
+
+                # check whether the observation is valid
+                keep_observation = True
+                black_pix_ratio = np.sum(semantic_obs == 0) / (img_height * img_width)
+                if black_pix_ratio > cfg.black_pixel_ratio:
+                    keep_observation = False
+                positive_depth = depth[depth > 0]
+                if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
+                    keep_observation = False
+                if not keep_observation and view_idx != total_views - 1:
+                    # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                    continue
+
+                # construct an frequency count map of each semantic id to a unique id
                 target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
                     detection_model=detection_model,
                     rgb=rgb[..., :3],
@@ -213,10 +245,6 @@ def main(cfg):
                     cfg=cfg.scene_graph,
                     target_obj_id=target_obj_id,
                     return_annotated=True
-                )
-                annotated_rgb = Image.fromarray(annotated_rgb)
-                annotated_rgb.save(
-                    os.path.join(episode_data_dir, f"{cnt_step}_annotated.png")
                 )
 
                 # check stop condition
@@ -229,7 +257,7 @@ def main(cfg):
                             # currently just consider that the object should be in around the horizontal center, not the vertical center
                             # due to the viewing angle difference
                             if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
-                                logging.info(f"Stop condition met at step {cnt_step}")
+                                logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
                                 target_found = True
 
                 # TSDF fusion
@@ -242,128 +270,87 @@ def main(cfg):
                     margin_h=int(cfg.margin_h_ratio * img_height),
                     margin_w=int(cfg.margin_w_ratio * img_width),
                 )
-                rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
 
-                # Get VLM relevancy
-                prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view?"
-                # logging.info(f"Prompt Rel: {prompt_text}")
-                smx_vlm_rel = vlm.get_loss(rgb_im, prompt_rel, ["Yes", "No"])
-                logging.info(f"Rel - Prob: {smx_vlm_rel}")
-
-                # Get frontier candidates
-                prompt_points_pix = []
-                if cfg.use_active:
-                    prompt_points_pix, fig = (
-                        tsdf_planner.find_prompt_points_within_view(
-                            pts_normal,
-                            img_width,
-                            img_height,
-                            cam_intr,
-                            cam_pose_tsdf,
-                            **cfg.visual_prompt,
-                        )
-                    )
-                    fig.tight_layout()
-                    plt.savefig(
-                        os.path.join(
-                            episode_data_dir, "{}_prompt_points.png".format(cnt_step)
-                        )
-                    )
-                    plt.close()
-
-                # Visual prompting
-                draw_letters = ["A", "B", "C", "D"]  # always four
-                fnt = ImageFont.truetype(
-                    "data/Open_Sans/static/OpenSans-Regular.ttf",
-                    30,
-                )
-                actual_num_prompt_points = len(prompt_points_pix)
-                if actual_num_prompt_points >= cfg.visual_prompt.min_num_prompt_points:
-                    rgb_im_draw = rgb_im.copy()
-                    draw = ImageDraw.Draw(rgb_im_draw)
-                    for prompt_point_ind, point_pix in enumerate(prompt_points_pix):
-                        draw.ellipse(
-                            (
-                                point_pix[0] - cfg.visual_prompt.circle_radius,
-                                point_pix[1] - cfg.visual_prompt.circle_radius,
-                                point_pix[0] + cfg.visual_prompt.circle_radius,
-                                point_pix[1] + cfg.visual_prompt.circle_radius,
-                            ),
-                            fill=(200, 200, 200, 255),
-                            outline=(0, 0, 0, 255),
-                            width=3,
-                        )
-                        draw.text(
-                            tuple(point_pix.astype(int).tolist()),
-                            draw_letters[prompt_point_ind],
-                            font=fnt,
-                            fill=(0, 0, 0, 255),
-                            anchor="mm",
-                            font_size=12,
-                        )
-                    rgb_im_draw.save(
-                        os.path.join(episode_data_dir, f"{cnt_step}_draw.png")
-                    )
-
-                    # get VLM reasoning for exploring
-                    if cfg.use_lsv:
-                        prompt_lsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it.\nWhich direction (black letters on the image) would you explore then? Answer with a single letter."
-                        # logging.info(f"Prompt Exp: {prompt_text}")
-                        lsv = vlm.get_loss(
-                            rgb_im_draw,
-                            prompt_lsv,
-                            draw_letters[:actual_num_prompt_points],
-                        )
-                        lsv *= actual_num_prompt_points / 3
+                if cfg.save_obs:
+                    if target_found:
+                        plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
                     else:
-                        lsv = (
-                            np.ones(actual_num_prompt_points) / actual_num_prompt_points
-                        )
+                        plt.imsave(os.path.join(episode_data_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
 
-                    # base - use image without label
-                    if cfg.use_gsv:
-                        prompt_gsv = f"\nConsider the question: '{question}', and you will explore the environment for answering it. Is there any direction shown in the image worth exploring? Answer with Yes or No."
-                        # logging.info(f"Prompt Exp base: {prompt_gsv}")
-                        gsv = vlm.get_loss(rgb_im, prompt_gsv, ["Yes", "No"])[0]
-                        gsv = (
-                            np.exp(gsv / cfg.gsv_T) / cfg.gsv_F
-                        )  # scale before combined with lsv
-                    else:
-                        gsv = 1
-                    sv = lsv * gsv
-                    logging.info(f"Exp - LSV: {lsv} GSV: {gsv} SV: {sv}")
-
-                    # Integrate semantics only if there is any prompted point
-                    tsdf_planner.integrate_sem(
-                        sem_pix=sv,
-                        radius=1.0,
-                        obs_weight=1.0,
-                    )  # voxel locations already saved in tsdf class
-
-                # Save data
-                # result[step_name]["smx_vlm_pred"] = smx_vlm_pred
-                # result[step_name]["smx_vlm_rel"] = smx_vlm_rel
-            else:
-                logging.info("Skipping black image!")
-                # result[step_name]["smx_vlm_pred"] = np.ones((4)) / 4
-                # result[step_name]["smx_vlm_rel"] = np.array([0.01, 0.99])
+                if target_found:
+                    break
 
             if target_found:
                 break
 
-            # Determine next point
-            return_values = tsdf_planner.find_next_pose_with_path(
+            update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
+            if not update_success:
+                logging.info(f"Question id {scene_id} invalid: update frontier map failed!")
+                break
+
+            # Turn to face each frontier point and get rgb image, and a score from vlm
+            for i, frontier in enumerate(tsdf_planner.frontiers):
+                pos_voxel = frontier.position
+                pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                # Turn to face the frontier point
+                if frontier.image is not None:
+                    original_path = os.path.join(episode_frontier_dir, frontier.image)
+                    if os.path.exists(original_path):
+                        target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
+                        os.system(f"cp {original_path} {target_path}")
+                    assert frontier.score != 0, f'{frontier.image}, {frontier.score}'
+                else:
+                    view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                    default_view_direction = np.asarray([0., 0., -1.])
+                    if np.linalg.norm(view_frontier_direction) < 1e-3:
+                        view_frontier_direction = default_view_direction
+                    if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                        # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                        # we need to specify rotating along y-axis
+                        agent_state.rotation = quat_to_coeffs(
+                            quaternion.quaternion(0, 0, 1, 0)
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                    else:
+                        agent_state.rotation = quat_to_coeffs(
+                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                    agent.set_state(agent_state)
+                    # Get observation at current pose - skip black image, meaning robot is outside the floor
+                    obs = simulator.get_sensor_observations()
+                    rgb = obs["color_sensor"]
+                    plt.imsave(
+                        os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
+                        rgb,
+                    )
+                    frontier.image = f"{cnt_step}_{i}.png"
+
+                    # Get score from VLM using rgb
+                    prompt = f"Consider the question: {question}, and you will explore the area in the image. Is the direction in the image worth exploring for answering the question? Answer with Yes or No."
+                    frontier.score = vlm.get_loss(rgb, prompt, ["Yes", "No"])[0]
+
+            max_point_choice = tsdf_planner.get_next_choice(
+                pts=pts_normal,
+                angle=angle,
+                cfg=cfg.planner,
+            )
+            if max_point_choice is None:
+                logging.info(f"Question {scene_id} invalid: no valid choice!")
+                break
+
+            return_values = tsdf_planner.get_next_navigation_point(
+                choice=max_point_choice,
                 pts=pts_normal,
                 angle=angle,
                 pathfinder=pathfinder,
                 cfg=cfg.planner,
-                flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
                 save_visualization=cfg.save_visualization,
             )
             if return_values[0] is None:
-                logging.info(f"Question invalid!")
+                logging.info(f"Question id {scene_id} invalid: find next navigation point failed!")
                 break
-
             pts_normal, angle, pts_pix, fig = return_values
 
             pts_pixs = np.vstack((pts_pixs, pts_pix))
@@ -385,6 +372,7 @@ def main(cfg):
                 plt.savefig(os.path.join(episode_data_dir, "{}_map.png".format(cnt_step)))
                 plt.close()
 
+            # update position and rotation
             pts_normal = np.append(pts_normal, floor_height)
             pts = pos_normal_to_habitat(pts_normal)
             rotation = get_quaternion(angle, camera_tilt)

@@ -3,18 +3,19 @@ seed: 42
 exp_name: vlm_exp
 output_parent_dir: results
 question_data_path: "generated_questions"
-scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
-scene_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/versioned_data/hm3d-0.2/hm3d"
-semantic_bbox_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/hm3d_obj_bbox_merged"
-detection_model_name: "yolo_world/s"
-path_data_dir: 'exploration_data'
+scene_dataset_config_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
+scene_data_path: "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d"
+semantic_bbox_data_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_obj_bbox_merged'
+detection_model_name: "yolo_world/x"
+path_data_dir: 'exploration_data_part2'
 
 
 # Question answering
 vlm:
   hf_token:
   device: cuda
-  model_id: prism-dinosiglip+7b
+  model_id: prism-dinosiglip+13b
+  cache_dir: '/gpfs/u/home/LMCG/LMCGnngn/scratch/yanghan/cache/'
 
 # Camera, image
 camera_height: 1.5
