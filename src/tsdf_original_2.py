@@ -705,8 +705,8 @@ class TSDFPlanner:
                 weight *= 1e-3
 
             # if the frontier is visited before, ignore it
-            if frontier.visited:
-                weight *= 1e-3
+            # if frontier.visited:
+            #     weight *= 1e-3
 
             # Save weight
             frontiers_weight = np.append(frontiers_weight, weight)

@@ -79,7 +79,7 @@ planner:
   min_frontier_area: 12  # the frontier should have at least this many pixels
   max_frontier_angle_range_deg: 90  # the angle spanned by the pixels in a frontier should not be larger than this
   min_frontier_angle_diff_deg: 30  # the angle between two frontiers should be larger than this. otherwise, merge them
-  score_T: 0.5
+  score_T: 0.333
 
 visual_prompt:
   cluster_threshold: 1.0
