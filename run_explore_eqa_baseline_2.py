@@ -297,7 +297,7 @@ def main(cfg):
                 if frontier.image is not None:
                     original_path = os.path.join(episode_frontier_dir, frontier.image)
                     if os.path.exists(original_path):
-                        target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_frontier_{i}.png")
+                        target_path = os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png")
                         os.system(f"cp {original_path} {target_path}")
                     assert frontier.score != 0, f'{frontier.image}, {frontier.score}'
                 else:
@@ -321,16 +321,23 @@ def main(cfg):
                     # Get observation at current pose - skip black image, meaning robot is outside the floor
                     obs = simulator.get_sensor_observations()
                     rgb = obs["color_sensor"]
-                    plt.imsave(
-                        os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                        rgb,
-                    )
+                    # plt.imsave(
+                    #     os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
+                    #     rgb,
+                    # )
                     frontier.image = f"{cnt_step}_{i}.png"
 
                     # Get score from VLM using rgb
                     rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
                     prompt = f"Consider the question: {question}, and you will explore the area in the image. Is the direction in the image worth exploring for answering the question? Answer with Yes or No."
                     frontier.score = vlm.get_loss(rgb_im, prompt, ["Yes", "No"])[0]
+
+                    # write the question and score on the image
+                    draw = ImageDraw.Draw(rgb_im)
+                    font = ImageFont.load_default()
+                    draw.text((10, 10), f"Question: {question}", (255, 255, 255), font=font)
+                    draw.text((10, 30), f"Score: {frontier.score}", (255, 255, 255), font=font)
+                    rgb_im.save(os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"))
 
             max_point_choice = tsdf_planner.get_next_choice(
                 pts=pts_normal,
