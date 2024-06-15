@@ -36,10 +36,12 @@ from src.vlm import VLM
 from src.tsdf_original_2 import TSDFPlanner, Frontier, Object
 from inference.models import YOLOWorld
 
+
 '''
-Baseline 2:
-Use explore-eqa like vlm prompting approach on my frontier exploration algorithm.
+Baseline 3:
+Random explore with my own frontier exploration algorithm
 '''
+
 
 def get_info(pathfinder, pos):
     is_navigable = pathfinder.is_navigable(pos)
@@ -61,7 +63,7 @@ def main(cfg):
     detection_model = YOLOWorld(model_id=cfg.detection_model_name)
 
     # Load VLM
-    vlm = VLM(cfg.vlm)
+    # vlm = VLM(cfg.vlm)
 
     # Load dataset
     all_paths_list = os.listdir(cfg.path_data_dir)
@@ -334,7 +336,8 @@ def main(cfg):
                     # Get score from VLM using rgb
                     rgb_im = Image.fromarray(rgb, mode="RGBA").convert("RGB")
                     prompt = f"Consider the question: {question}, and you will explore the area in the image. Is the direction in the image worth exploring for answering the question? Answer with Yes or No."
-                    frontier.score = vlm.get_loss(rgb_im, prompt, ["Yes", "No"])[0]
+                    # frontier.score = vlm.get_loss(rgb_im, prompt, ["Yes", "No"])[0]
+                    frontier.score = 0.0
 
                     if cfg.save_frontier:
                         # write the question and score on the image

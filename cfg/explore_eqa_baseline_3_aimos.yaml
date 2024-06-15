@@ -1,0 +1,99 @@
+# General
+seed: 42
+exp_name: baseline_3
+output_parent_dir: results
+question_data_path: "generated_questions"
+scene_dataset_config_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
+scene_data_path: "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d"
+semantic_bbox_data_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_obj_bbox_merged'
+detection_model_name: "yolo_world/x"
+path_data_dir: 'exploration_data_part2'
+
+
+# Question answering
+vlm:
+  hf_token:
+  device: cuda
+  model_id: prism-dinosiglip+13b
+  cache_dir: '/gpfs/u/home/LMCG/LMCGnngn/scratch/yanghan/cache/'
+
+# Camera, image
+camera_height: 1.5
+camera_tilt_deg: -30
+img_width: 720
+img_height: 720
+hfov: 120
+tsdf_grid_size: 0.1
+margin_w_ratio: 0.25
+margin_h_ratio: 0.6
+
+save_obs: true
+save_visualization: false
+save_frontier: false
+
+# Stop criteria
+stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
+stop_max_bias_from_center: 0.4  # the target object should be within 60% of the image center horizontally
+
+# Navigation
+init_clearance: 0.3
+max_step_room_size_ratio: 3
+min_random_init_steps: 2
+extra_view_phase_1: 6
+extra_view_angle_deg_phase_1: 40
+extra_view_phase_2: 8  # in phase 2, have more observations
+extra_view_angle_deg_phase_2: 45
+
+# Observation filtering
+black_pixel_ratio: 0.2
+min_30_percentile_depth: 0.1
+collision_dist: 1
+
+# Semantic map
+use_active: true
+use_lsv: true
+use_gsv: true
+gsv_T: 0.5
+gsv_F: 3
+planner:
+  dist_T: 9999
+  unexplored_T: 2.0
+  unoccupied_T: 2.0
+  val_T: 0.5
+  val_dir_T: 0.5
+  max_val_check_frontier: 3
+  smooth_sigma: 5
+  eps: 1
+  min_dist_from_cur: 0.5
+  max_dist_from_cur_phase_1: 2  # when the target object is not found, explore the frontiers with this step length
+  max_dist_from_cur_phase_2: 0.5  # when the target object is found, go to the target object with this step length
+  max_unexplored_check_frontier: 3
+  max_unoccupied_check_frontier: 1
+  final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
+
+  # about frontier selection
+  frontier_spacing: 0.5
+  frontier_edge_area_min: 4
+  frontier_edge_area_max: 6
+  frontier_area_min: 8
+  frontier_area_max: 9
+  min_frontier_area: 12  # the frontier should have at least this many pixels
+  max_frontier_angle_range_deg: 90  # the angle spanned by the pixels in a frontier should not be larger than this
+  min_frontier_angle_diff_deg: 30  # the angle between two frontiers should be larger than this. otherwise, merge them
+  score_T: 0.333
+
+visual_prompt:
+  cluster_threshold: 1.0
+  num_prompt_points: 3
+  num_max_unoccupied: 300
+  min_points_for_clustering: 3
+  point_min_dist: 2
+  point_max_dist: 10
+  cam_offset: 0.6
+  min_num_prompt_points: 2
+  circle_radius: 18
+
+scene_graph:
+  confidence: 0.003
+  nms_threshold: 0.1
+  iou_threshold: 0.5
