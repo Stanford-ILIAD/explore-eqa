@@ -65,6 +65,7 @@ def main(cfg):
 
     total_questions = 0
     success_count = 0
+    total_step_count = 0
 
     # Run all questions
     for question_idx in tqdm(range(len(all_paths_list))):
@@ -389,7 +390,10 @@ def main(cfg):
         if target_found:
             success_count += 1
 
+        total_step_count += cnt_step
+
         logging.info(f"Success rate: {success_count}/{total_questions} = {success_count / total_questions}")
+        logging.info(f"Average steps: {total_step_count / total_questions}")
 
 
 
