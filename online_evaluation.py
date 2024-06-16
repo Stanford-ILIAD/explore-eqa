@@ -150,7 +150,9 @@ def main(cfg):
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
 
-        # Load scene features
+        scene_feature_map = load_scene_features(cfg.scene_features_path, scene_id)
+
+        # Evaluate each question
         for question_id in all_question_id_in_scene:
             question_ind += 1
             metadata = json.load(open(os.path.join(cfg.path_data_dir, question_id, "metadata.json"), "r"))
@@ -201,9 +203,7 @@ def main(cfg):
             pts_pixs = np.empty((0, 2))
             pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(pts)[:2]))
 
-            logging.info(f'\n\nQuestion id {question_id} initialization successful!')
-
-            scene_feature_map = load_scene_features(cfg.scene_features_path, question_id)
+            logging.info(f'\n\nQuestion id {scene_id} initialization successful!')
 
             # run steps
             path_length = 0
