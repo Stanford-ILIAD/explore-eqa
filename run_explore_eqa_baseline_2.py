@@ -68,7 +68,7 @@ def main(cfg):
 
     total_questions = 0
     success_count = 0
-    total_step_count = 0
+    total_explore_distance = 0
 
     # Run all questions
     for question_idx in tqdm(range(len(all_paths_list))):
@@ -171,6 +171,8 @@ def main(cfg):
         # Run steps
         target_found = False
         cnt_step = -1
+        explore_distance = 0
+        prev_pts = pts.copy()
         while cnt_step < num_step - 1:
             cnt_step += 1
             logging.info(f"\n== step: {cnt_step}")
@@ -390,13 +392,17 @@ def main(cfg):
             pts = pos_normal_to_habitat(pts_normal)
             rotation = get_quaternion(angle, camera_tilt)
 
+            # update distance
+            explore_distance += np.linalg.norm(pts - prev_pts)
+            prev_pts = pts.copy()
+
         if target_found:
             success_count += 1
 
-        total_step_count += cnt_step
+        total_explore_distance += explore_distance
 
         logging.info(f"Success rate: {success_count}/{total_questions} = {success_count / total_questions}")
-        logging.info(f"Average steps: {total_step_count / total_questions}")
+        logging.info(f"Average steps: {total_explore_distance / total_questions}")
 
 
 
