@@ -34,7 +34,7 @@ from src.habitat import (
     get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
-from src.tsdf_tempt import TSDFPlanner, Frontier, Object
+from src.tsdf import TSDFPlanner, Frontier, Object
 from src.eval_utils import prepare_step_dict, get_item, encode, load_scene_features, rgba2rgb, load_checkpoint
 from habitat_sim.utils.common import d3_40_colors_rgb
 from inference.models import YOLOWorld

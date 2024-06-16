@@ -10,9 +10,7 @@ semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_o
 detection_model_name: "yolo_world/x"
 scene_features_path: /home/yuncongyang_umass_edu/scene_understanding/scene_feature_dict
 model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_new.pt
-
-# Sample navigation point
-min_travel_dist: 5.0
+path_data_dir: exploration_data_sample
 
 # Camera, image
 camera_height: 1.5
@@ -27,9 +25,6 @@ margin_h_ratio: 0.6
 save_obs: true
 save_visualization: true
 save_frontier_video: true
-del_fail_case: false
-
-paths_per_question: 1
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -37,7 +32,7 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.3
-max_step_dist_ratio: 2.4
+max_step_room_size_ratio: 3
 min_random_init_steps: 2
 extra_view_phase_1: 6
 extra_view_angle_deg_phase_1: 40
@@ -48,9 +43,6 @@ extra_view_angle_deg_phase_2: 45
 black_pixel_ratio: 0.2
 min_30_percentile_depth: 0.1
 collision_dist: 1
-
-# Scene graph
-min_pix_ratio: 0.005
 
 # Semantic map
 use_active: true
@@ -73,7 +65,6 @@ planner:
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
   final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
-  return_choice: true  # always set to true to return max_point
 
   # about frontier selection
   frontier_spacing: 0.5
