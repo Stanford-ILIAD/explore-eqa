@@ -1,0 +1,14 @@
+{
+    "question": "What is the primary color of the desk chair that is in front of the white desk with shelves and various items on it?",
+    "answer": "Pink.",
+    "scene": "00009-vLpv2VX547B",
+    "init_pts": [
+        -3.7423441410064697,
+        0.11009860038757324,
+        -3.0884838104248047
+    ],
+    "init_angle": -1.7485677479507822,
+    "target_obj_id": 46,
+    "target_obj_class": "desk chair",
+    "episode_length": 16
+}
