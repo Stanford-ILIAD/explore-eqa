@@ -31,6 +31,7 @@ from numba import njit, prange
 import random
 import copy
 import logging
+import torch
 import matplotlib.pyplot as plt
 import scipy.ndimage as ndimage
 from skimage import measure
@@ -54,6 +55,7 @@ class Frontier:
     frontier_id: int  # unique id for the frontier to identify its region on the frontier map
     visited: bool = False  # whether the frontier has been visited before
     image: str = None
+    feature: torch.Tensor = None
 
     def __eq__(self, other):
         if not isinstance(other, Frontier):
@@ -611,10 +613,12 @@ class TSDFPlanner:
                     ):
                         # create a new frontier with the old image
                         old_img_path = frontier.image
+                        old_img_feature = frontier.feature
                         filtered_frontiers.append(
                             self.create_frontier(valid_ft_angles[update_ft_idx], frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                         )
                         filtered_frontiers[-1].image = old_img_path
+                        filtered_frontiers[-1].feature = old_img_feature
                         valid_ft_angles.pop(update_ft_idx)
         self.frontiers = filtered_frontiers
 
