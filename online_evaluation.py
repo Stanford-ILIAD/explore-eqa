@@ -159,7 +159,7 @@ def main(cfg):
             question = metadata["question"]
             init_pts = metadata["init_pts"]
             init_angle = metadata["init_angle"]
-            target_obj_id = metadata['object_id']
+            target_obj_id = metadata['target_obj_id']
             target_obj_class = metadata['target_obj_class']
             # get target object global location
             obj_bbox = [item['bbox'] for item in bounding_box_data if int(item['id']) == target_obj_id][0]
