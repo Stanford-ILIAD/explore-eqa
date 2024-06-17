@@ -36,7 +36,6 @@ from src.habitat import (
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf_rollout import TSDFPlanner, Frontier, Object
 from src.eval_utils import prepare_step_dict, get_item, encode, load_scene_features, rgba2rgb, load_checkpoint
-from habitat_sim.utils.common import d3_40_colors_rgb
 from inference.models import YOLOWorld
 
 from llava.model.builder import load_pretrained_model
@@ -541,7 +540,8 @@ def main(cfg):
                 logging.info(f"Question id {question_id} failed, {path_length} length")
             path_length_list.append(path_length)
 
-            logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}, mean path length: {np.mean(path_length_list):.2f}")
+            logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
+            logging.info(f"Mean path length for success exploration: {np.mean([x for i, x in enumerate(path_length_list) if success_list[i] == 1])}")
 
         logging.info(f'Scene {scene_id} finish')
 

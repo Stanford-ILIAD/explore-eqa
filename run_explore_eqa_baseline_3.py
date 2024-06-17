@@ -43,13 +43,6 @@ Random explore with my own frontier exploration algorithm
 '''
 
 
-def get_info(pathfinder, pos):
-    is_navigable = pathfinder.is_navigable(pos)
-    hit_record = pathfinder.closest_obstacle_surface_point(pos, 0.5)
-    dist = hit_record.hit_dist
-    return is_navigable, dist
-
-
 def main(cfg):
     camera_tilt = cfg.camera_tilt_deg * np.pi / 180
     img_height = cfg.img_height
@@ -67,6 +60,7 @@ def main(cfg):
 
     # Load dataset
     all_paths_list = os.listdir(cfg.path_data_dir)
+    all_paths_list = [question_id for question_id in all_paths_list if 650 < int(question_id.split('-')[0]) < 750]
 
     total_questions = 0
     success_count = 0
@@ -100,8 +94,6 @@ def main(cfg):
             del tsdf_planner
         except:
             pass
-
-        # Set up scene in Habitat
         try:
             simulator.close()
         except:
@@ -400,11 +392,10 @@ def main(cfg):
 
         if target_found:
             success_count += 1
-
-        total_explore_distance += explore_distance
+            total_explore_distance += explore_distance
 
         logging.info(f"Success rate: {success_count}/{total_questions} = {success_count / total_questions}")
-        logging.info(f"Average steps: {total_explore_distance / total_questions}")
+        logging.info(f"Average explore distance for successful episodes: {total_explore_distance / success_count}")
 
 
 

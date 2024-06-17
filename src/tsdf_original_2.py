@@ -172,8 +172,7 @@ class TSDFPlanner:
 
         self.frontiers_weight = None
 
-    def update_scene_graph(self, detection_model, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id,
-                           return_annotated=False):
+    def update_scene_graph(self, detection_model, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id, return_annotated=False):
         target_found = False
 
         unique_obj_ids = np.unique(semantic_obs)
@@ -226,9 +225,9 @@ class TSDFPlanner:
                         # add to simple scene graph
                         self.simple_scene_graph[obj_id] = bbox_center
 
-                    adopted_indices.append(i)
                     if obj_id == target_obj_id:
                         target_found = True
+                        adopted_indices.append(i)
 
                     break
 
@@ -779,8 +778,7 @@ class TSDFPlanner:
                         dist_to_travel -= seg_length
                     else:
                         # find the point on the segment according to the length ratio
-                        next_point_habitat = path_to_target[i] + (
-                                    path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
+                        next_point_habitat = path_to_target[i] + (path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
                         next_point = self.world2vox(pos_habitat_to_normal(next_point_habitat))[:2]
                         break
             else:
@@ -798,8 +796,7 @@ class TSDFPlanner:
                 next_point = np.round(next_point).astype(int)
 
         next_point_old = next_point.copy()
-        next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size,
-                                             max_adjust_distance=0.1)
+        next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
         # determine the direction: from next point to max point
         if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
