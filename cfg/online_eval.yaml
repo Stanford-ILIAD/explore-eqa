@@ -1,6 +1,6 @@
 # General
 seed: 66
-exp_name: exp_normal
+exp_name: exp_online_eval
 output_parent_dir: /work/pi_chuangg_umass_edu/yuncong/results
 question_data_path: "generated_questions"
 scene_dataset_config_path: '/project/pi_chuangg_umass_edu/yuncong/data_v2/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
