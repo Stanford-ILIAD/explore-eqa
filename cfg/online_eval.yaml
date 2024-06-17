@@ -10,7 +10,7 @@ semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_o
 detection_model_name: "yolo_world/x"
 scene_features_path: /home/yuncongyang_umass_edu/scene_understanding/scene_feature_dict
 model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_new.pt
-path_data_dir: exploration_data_sample
+path_data_dir: exploration_data
 
 # Camera, image
 camera_height: 1.5
