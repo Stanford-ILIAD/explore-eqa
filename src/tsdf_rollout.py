@@ -758,19 +758,26 @@ class TSDFPlanner:
         next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
         # determine the direction: from next point to max point
-        if np.array_equal(next_point.astype(int), self.max_point.position):  # if the next point is the max point
-            # this case should not happen actually, since the exploration should end before this
-            if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
-                # then just set some random direction
-                direction = np.array([
-                    np.cos(angle + np.pi / 2),
-                    np.sin(angle + np.pi / 2),
-                ])  # the direction does not change
+        # if np.array_equal(next_point.astype(int), self.max_point.position):  # if the next point is the max point
+        #     # this case should not happen actually, since the exploration should end before this
+        #     if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
+        #         # then just set some random direction
+        #         direction = np.array([
+        #             np.cos(angle + np.pi / 2),
+        #             np.sin(angle + np.pi / 2),
+        #         ])  # the direction does not change
+        #     else:
+        #         direction = self.max_point.position - cur_point[:2]
+        # else:
+        #     # normal direction from next point to max point
+        #     direction = self.max_point.position - next_point
+        if target_arrived:  # if the next arriving position is the target point
+            if type(self.max_point) == Frontier:
+                direction = self.rad2vector(angle)  # if the target is a frontier, then the agent's orientation does not change
             else:
-                direction = self.max_point.position - cur_point[:2]
-        else:
-            # normal direction from next point to max point
-            direction = self.max_point.position - next_point
+                direction = self.max_point.position - cur_point[:2]  # if the target is an object, then the agent should face the object
+        else:  # the agent is still on the way to the target point
+            direction = next_point - cur_point[:2]
         direction = direction / np.linalg.norm(direction)
 
         # mark the max point as visited if it is a frontier
