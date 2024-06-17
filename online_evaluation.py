@@ -286,16 +286,10 @@ def main(cfg):
                         )
 
                     # check stop condition
-                    max_point_obj_id = None
-                    try:
-                        max_point_obj_id = max_point_choice.obj_id
-                    except:
-                        pass
                     if target_in_view:
                         if target_obj_id in tsdf_planner.simple_scene_graph.keys():
                             target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
-                            max_point_obj_pix_ratio = np.sum(semantic_obs == max_point_obj_id) / (img_height * img_width)
-                            logging.debug(f"Target object pix ratio: {target_obj_pix_ratio}, Max point object pix ratio: {max_point_obj_pix_ratio}")
+                            logging.debug(f"Target object pix ratio: {target_obj_pix_ratio}")
                             if target_obj_pix_ratio > 0:
                                 obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
                                 bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
@@ -453,11 +447,11 @@ def main(cfg):
                         if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.simple_scene_graph):
                             logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.simple_scene_graph)}, failed!")
                             break
-                        target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
-                        target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[target_obj_id])[:2]
+                        pred_target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
+                        target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[pred_target_obj_id])[:2]
                         logging.info(f"Next choice: Object at {target_point}")
                         tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                        max_point_choice = Object(target_point.astype(int), target_obj_id)
+                        max_point_choice = Object(target_point.astype(int), pred_target_obj_id)
                     else:
                         if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
                             logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
