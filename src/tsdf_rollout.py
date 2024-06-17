@@ -174,8 +174,7 @@ class TSDFPlanner:
 
         self.frontiers_weight = None
 
-    def update_scene_graph(self, detection_model, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id,
-                           return_annotated=False):
+    def update_scene_graph(self, detection_model, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id, return_annotated=False):
         target_found = False
 
         unique_obj_ids = np.unique(semantic_obs)
@@ -228,9 +227,9 @@ class TSDFPlanner:
                         # add to simple scene graph
                         self.simple_scene_graph[obj_id] = bbox_center
 
-                    adopted_indices.append(i)
                     if obj_id == target_obj_id:
                         target_found = True
+                        adopted_indices.append(i)
 
                     break
 
@@ -763,7 +762,10 @@ class TSDFPlanner:
             # this case should not happen actually, since the exploration should end before this
             if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
                 # then just set some random direction
-                direction = self.rad2vector(angle)  # the direction does not change
+                direction = np.array([
+                    np.cos(angle + np.pi / 2),
+                    np.sin(angle + np.pi / 2),
+                ])  # the direction does not change
             else:
                 direction = self.max_point.position - cur_point[:2]
         else:
