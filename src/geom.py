@@ -514,6 +514,13 @@ def IoU(region_1, region_2):
     return intersection / union
 
 
+def get_proper_step_length(dist, min_length, max_length, min_threshold, max_threshold):
+    if dist < min_threshold:
+        return min_length
+    elif dist > max_threshold:
+        return max_length
+    else:
+        return min_length + (max_length - min_length) * (dist - min_threshold) / (max_threshold - min_threshold)
 
 
 
