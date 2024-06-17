@@ -1048,7 +1048,10 @@ class TSDFPlanner:
         if found_path:
             return path.geodesic_distance, path.points
         else:
-            return np.linalg.norm(p1 - p2) * self._voxel_size, None
+            if input_voxel:
+                return np.linalg.norm(p1 - p2) * self._voxel_size, None
+            else:
+                return np.linalg.norm(p1 - p2), None
 
     def habitat2voxel(self, pts):
         pts_normal = pos_habitat_to_normal(pts)
