@@ -286,12 +286,20 @@ def main(cfg):
                         )
 
                     # check stop condition
+                    max_point_obj_id = None
+                    try:
+                        max_point_obj_id = max_point_choice.obj_id
+                    except:
+                        pass
                     if target_in_view:
                         if target_obj_id in tsdf_planner.simple_scene_graph.keys():
                             target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
+                            max_point_obj_pix_ratio = np.sum(semantic_obs == max_point_obj_id) / (img_height * img_width)
+                            logging.debug(f"Target object pix ratio: {target_obj_pix_ratio}, Max point object pix ratio: {max_point_obj_pix_ratio}")
                             if target_obj_pix_ratio > 0:
                                 obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
                                 bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
+                                logging.debug(f"Bias from center: {bias_from_center}")
                                 # currently just consider that the object should be in around the horizontal center, not the vertical center
                                 # due to the viewing angle difference
                                 if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
@@ -342,127 +350,137 @@ def main(cfg):
                     logging.info(f"Question id {scene_id} invalid: update frontier map failed!")
                     break
 
-                step_dict["frontiers"] = []
-                # Seems buggy here
-                for i, frontier in enumerate(tsdf_planner.frontiers):
-                    frontier_dict = {}
-                    pos_voxel = frontier.position
-                    pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
-                    pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
-                    frontier_dict["coordinate"] = pos_world.tolist()
-                    # Turn to face the frontier point
-                    if frontier.image is not None:
-                        frontier_dict["rgb_feature"] = frontier.feature
-                        frontier_dict["rgb_id"] = frontier.image
-                    else:
-                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                        default_view_direction = np.asarray([0., 0., -1.])
-                        if np.linalg.norm(view_frontier_direction) < 1e-3:
-                            view_frontier_direction = default_view_direction
-                        if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
-                            # if the rotation is to rotate 180 degree, then the quaternion is not unique
-                            # we need to specify rotating along y-axis
-                            agent_state.rotation = quat_to_coeffs(
-                                quaternion.quaternion(0, 0, 1, 0)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
+                if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
+                    # choose a frontier, and set it as the explore target
+                    step_dict["frontiers"] = []
+                    # Seems buggy here
+                    for i, frontier in enumerate(tsdf_planner.frontiers):
+                        frontier_dict = {}
+                        pos_voxel = frontier.position
+                        pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                        pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                        frontier_dict["coordinate"] = pos_world.tolist()
+                        # Turn to face the frontier point
+                        if frontier.image is not None:
+                            frontier_dict["rgb_feature"] = frontier.feature
+                            frontier_dict["rgb_id"] = frontier.image
                         else:
-                            agent_state.rotation = quat_to_coeffs(
-                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
-                        agent.set_state(agent_state)
-                        # Get observation at current pose - skip black image, meaning robot is outside the floor
-                        obs = simulator.get_sensor_observations()
-                        rgb = obs["color_sensor"]
-                        plt.imsave(
-                            os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                            rgb,
+                            view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                            default_view_direction = np.asarray([0., 0., -1.])
+                            if np.linalg.norm(view_frontier_direction) < 1e-3:
+                                view_frontier_direction = default_view_direction
+                            if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                                # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                                # we need to specify rotating along y-axis
+                                agent_state.rotation = quat_to_coeffs(
+                                    quaternion.quaternion(0, 0, 1, 0)
+                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                                ).tolist()
+                            else:
+                                agent_state.rotation = quat_to_coeffs(
+                                    quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                                ).tolist()
+                            agent.set_state(agent_state)
+                            # Get observation at current pose - skip black image, meaning robot is outside the floor
+                            obs = simulator.get_sensor_observations()
+                            rgb = obs["color_sensor"]
+                            plt.imsave(
+                                os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
+                                rgb,
+                            )
+                            processed_rgb = rgba2rgb(rgb)
+                            with torch.no_grad():
+                                img_feature = encode(model, image_processor, processed_rgb).mean(1)
+                            assert img_feature is not None
+                            frontier.image = f"{cnt_step}_{i}.png"
+                            frontier.feature = img_feature
+                            frontier_dict["rgb_feature"] = img_feature
+                            frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"
+                        step_dict["frontiers"].append(frontier_dict)
+                        assert frontier_dict["rgb_feature"] is not None
+
+                    # add model prediction here
+                    if len(step_dict["frontiers"]) > 0:
+                        step_dict["frontier_features"] = torch.cat(
+                            [
+                                frontier["rgb_feature"] for frontier in step_dict["frontiers"]
+                            ],
+                            dim=0
+                        ).to("cpu")
+                    else:
+                        step_dict["frontier_features"] = None
+                    step_dict["question"] = question
+                    step_dict["scene"] = scene_id
+                    step_dict["scene_feature_map"] = scene_feature_map
+
+                    try:
+                        sample = get_item(
+                            tokenizer, step_dict
                         )
-                        processed_rgb = rgba2rgb(rgb)
-                        with torch.no_grad():
-                            img_feature = encode(model, image_processor, processed_rgb).mean(1)
-                        assert img_feature is not None
-                        frontier.image = f"{cnt_step}_{i}.png"
-                        frontier.feature = img_feature
-                        frontier_dict["rgb_feature"] = img_feature
-                        frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"
-                    step_dict["frontiers"].append(frontier_dict)
-                    assert frontier_dict["rgb_feature"] is not None
-
-                # add model prediction here
-                if len(step_dict["frontiers"]) > 0:
-                    step_dict["frontier_features"] = torch.cat(
-                        [
-                            frontier["rgb_feature"] for frontier in step_dict["frontiers"]
-                        ],
-                        dim=0
-                    ).to("cpu")
-                else:
-                    step_dict["frontier_features"] = None
-                step_dict["question"] = question
-                step_dict["scene"] = scene_id
-                step_dict["scene_feature_map"] = scene_feature_map
-
-                try:
-                    sample = get_item(
-                        tokenizer, step_dict
+                    except:
+                        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+                        break
+                    feature_dict = EasyDict(
+                        scene_feature = sample.scene_feature.to("cuda"),
+                        scene_insert_loc = sample.scene_insert_loc,
+                        scene_length = sample.scene_length,
                     )
-                except:
-                    logging.info(f"Get item failed! (most likely no frontiers and no objects)")
-                    break
-                feature_dict = EasyDict(
-                    scene_feature = sample.scene_feature.to("cuda"),
-                    scene_insert_loc = sample.scene_insert_loc,
-                    scene_length = sample.scene_length,
-                )
-                input_ids = sample.input_ids.to("cuda")
-                answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
-                input_ids = input_ids[:, :answer_ind+2]
-                with torch.no_grad():
-                    with torch.inference_mode() and torch.autocast(device_type="cuda"):
-                        output_ids = model.generate(
-                            input_ids,
-                            feature_dict=feature_dict,
-                            do_sample=False,
-                            max_new_tokens=10,
-                        )
-                    outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
-                try:
-                    target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
-                    print(f"Prediction: {target_type}, {target_index}")
-                except:
-                    logging.info(f"Wrong output format, failed!")
-                    break
-
-                if target_type not in ["object", "frontier"]:
-                    logging.info(f"Invalid prediction type: {target_type}, failed!")
-                    break
-
-                if target_type == "object":
-                    if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.simple_scene_graph):
-                        logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.simple_scene_graph)}, failed!")
+                    input_ids = sample.input_ids.to("cuda")
+                    answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
+                    input_ids = input_ids[:, :answer_ind+2]
+                    with torch.no_grad():
+                        with torch.inference_mode() and torch.autocast(device_type="cuda"):
+                            output_ids = model.generate(
+                                input_ids,
+                                feature_dict=feature_dict,
+                                do_sample=False,
+                                max_new_tokens=10,
+                            )
+                        outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+                    try:
+                        target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
+                        print(f"Prediction: {target_type}, {target_index}")
+                    except:
+                        logging.info(f"Wrong output format, failed!")
                         break
-                    target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
-                    target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[target_obj_id])[:2]
-                    logging.info(f"Next choice: Object at {target_point}")
-                    tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                    max_point_choice = Object(target_point.astype(int), target_obj_id)
-                else:
-                    if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
-                        logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
+
+                    if target_type not in ["object", "frontier"]:
+                        logging.info(f"Invalid prediction type: {target_type}, failed!")
                         break
-                    target_point = tsdf_planner.frontiers[int(target_index)].position
-                    logging.info(f"Next choice: Frontier at {target_point}")
-                    tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                    max_point_choice = tsdf_planner.frontiers[int(target_index)]
 
-                if max_point_choice is None:
-                    logging.info(f"Question id {question_id} invalid: no valid choice!")
-                    break
+                    if target_type == "object":
+                        if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.simple_scene_graph):
+                            logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.simple_scene_graph)}, failed!")
+                            break
+                        target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
+                        target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[target_obj_id])[:2]
+                        logging.info(f"Next choice: Object at {target_point}")
+                        tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
+                        max_point_choice = Object(target_point.astype(int), target_obj_id)
+                    else:
+                        if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
+                            logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
+                            break
+                        target_point = tsdf_planner.frontiers[int(target_index)].position
+                        logging.info(f"Next choice: Frontier at {target_point}")
+                        tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
+                        max_point_choice = tsdf_planner.frontiers[int(target_index)]
 
-                return_values = tsdf_planner.get_next_navigation_point(
-                    choice=max_point_choice,
+                    if max_point_choice is None:
+                        logging.info(f"Question id {question_id} invalid: no valid choice!")
+                        break
+
+                    update_success = tsdf_planner.set_next_navigation_point(
+                        choice=max_point_choice,
+                        pts=pts_normal,
+                        cfg=cfg.planner,
+                    )
+                    if not update_success:
+                        logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
+                        break
+
+                return_values = tsdf_planner.agent_step(
                     pts=pts_normal,
                     angle=angle,
                     pathfinder=pathfinder,
@@ -523,10 +541,10 @@ def main(cfg):
                 logging.info(f"Question id {question_id} finish with {cnt_step} steps, {path_length} length")
             else:
                 success_list.append(0)
-                logging.info(f"Question id {question_id} failed.")
+                logging.info(f"Question id {question_id} failed, {path_length} length")
             path_length_list.append(path_length)
 
-            logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
+            logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}, mean path length: {np.mean(path_length_list):.2f}")
 
         logging.info(f'Scene {scene_id} finish')
 

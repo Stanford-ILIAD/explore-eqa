@@ -158,6 +158,7 @@ class TSDFPlanner:
 
         self.target_direction = None
         self.max_point = None
+        self.target_point = None
         self.simple_scene_graph = {}
         self.frontiers: List[Frontier] = []
 
@@ -653,17 +654,18 @@ class TSDFPlanner:
 
         return True
 
-    def get_next_navigation_point(
+    def set_next_navigation_point(
             self,
             choice: Union[Object, Frontier],
             pts,
-            angle,
-            pathfinder,
             cfg,
-            save_visualization=True,
-    ):
+    ) -> bool:
+        if self.max_point is not None or self.target_point is not None:
+            # if the next point is already set
+            logging.error(f"Error in set_next_navigation_point: the next point is already set: {self.max_point}, {self.target_point}")
+            return False
         cur_point = self.world2vox(pts)
-        max_point = choice
+        self.max_point = choice
 
         if type(choice) == Object:
             target_point = choice.position
@@ -671,20 +673,19 @@ class TSDFPlanner:
             # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
             # since it's not proper to directly go to the target point,
             # we'd better find a navigable point that is certain distance from it to better observe the target
-            target_navigable_point = get_proper_observe_point(target_point, self.unoccupied, cur_point=cur_point,
-                                                              dist=cfg.final_observe_distance / self._voxel_size)
+            target_navigable_point = get_proper_observe_point(target_point, self.unoccupied, cur_point=cur_point, dist=cfg.final_observe_distance / self._voxel_size)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
-                logging.error(
-                    f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
-                return (None,)
-            next_point = target_navigable_point
+                logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
+                return False
+            self.target_point = target_navigable_point
+            return True
         elif type(choice) == Frontier:
             # find the direction into unexplored
-            ft_direction = max_point.orientation
+            ft_direction = self.max_point.orientation
 
             # find an unoccupied point between the agent and the frontier
-            next_point = np.array(max_point.position, dtype=float)
+            next_point = np.array(self.max_point.position, dtype=float)
             try_count = 0
             while (
                     not self.check_within_bnds(next_point.astype(int)) or
@@ -695,20 +696,34 @@ class TSDFPlanner:
                 try_count += 1
                 if try_count > 1000:
                     logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point")
-                    return (None,)
+                    return False
 
-            next_point = next_point.astype(int)
+            self.target_point = next_point.astype(int)
+            return True
         else:
             logging.error(f"Error in find_next_pose_with_path: wrong choice type: {type(choice)}")
-            return (None,)
+            return False
 
+    def agent_step(
+            self,
+            pts,
+            angle,
+            pathfinder,
+            cfg,
+            save_visualization=True,
+    ):
+        if self.max_point is None or self.target_point is None:
+            logging.error(f"Error in agent_step: max_point or next_point is None: {self.max_point}, {self.target_point}")
+            return (None,)
         # check the distance to next navigation point
         # if the target navigation point is too far
         # then just go to a point between the current point and the target point
-        max_dist_from_cur = cfg.max_dist_from_cur_phase_1 if type(max_point) == Frontier else cfg.max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
-        dist, path_to_target = self.get_distance(cur_point[:2], next_point, height=pts[2], pathfinder=pathfinder)
+        cur_point = self.world2vox(pts)
+        max_dist_from_cur = cfg.max_dist_from_cur_phase_1 if type(self.max_point) == Frontier else cfg.max_dist_from_cur_phase_2  # in phase 2, the step size should be smaller
+        dist, path_to_target = self.get_distance(cur_point[:2], self.target_point, height=pts[2], pathfinder=pathfinder)
 
         if dist > max_dist_from_cur:
+            target_arrived = False
             if path_to_target is not None:
                 # drop the y value of the path to avoid errors when calculating seg_length
                 path_to_target = [np.asarray([p[0], 0.0, p[2]]) for p in path_to_target]
@@ -720,43 +735,45 @@ class TSDFPlanner:
                         dist_to_travel -= seg_length
                     else:
                         # find the point on the segment according to the length ratio
-                        next_point_habitat = path_to_target[i] + (
-                                    path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
+                        next_point_habitat = path_to_target[i] + (path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
                         next_point = self.world2vox(pos_habitat_to_normal(next_point_habitat))[:2]
                         break
             else:
                 # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
-                walk_dir = next_point - cur_point[:2]
+                walk_dir = self.target_point - cur_point[:2]
                 walk_dir = walk_dir / np.linalg.norm(walk_dir)
-                next_point = cur_point[:2] + (next_point - cur_point[:2]) * max_dist_from_cur / dist
+                next_point = cur_point[:2] + walk_dir * max_dist_from_cur
                 # ensure next point is valid, otherwise go backward a bit
                 while (
                         not self.check_within_bnds(next_point)
                         or not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                         or self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                 ):
-                    next_point -= walk_dir * 0.3 / self._voxel_size
+                    next_point -= walk_dir
                 next_point = np.round(next_point).astype(int)
+        else:
+            target_arrived = True
+            next_point = self.target_point.copy()
 
         next_point_old = next_point.copy()
         next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
         # determine the direction: from next point to max point
-        if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
+        if np.array_equal(next_point.astype(int), self.max_point.position):  # if the next point is the max point
             # this case should not happen actually, since the exploration should end before this
             if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
                 # then just set some random direction
                 direction = np.random.randn(2)
             else:
-                direction = max_point.position - cur_point[:2]
+                direction = self.max_point.position - cur_point[:2]
         else:
             # normal direction from next point to max point
-            direction = max_point.position - next_point
+            direction = self.max_point.position - next_point
         direction = direction / np.linalg.norm(direction)
 
         # mark the max point as visited if it is a frontier
-        if type(max_point) == Frontier:
-            max_point.visited = True
+        if type(self.max_point) == Frontier:
+            self.max_point.visited = True
 
         # Plot
         fig = None
@@ -764,7 +781,7 @@ class TSDFPlanner:
             fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(20, 18))
             agent_orientation = self.rad2vector(angle)
             ax1.imshow(self.unoccupied)
-            ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
             ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1,
                       head_width=0.8, head_length=0.8, color='b')
@@ -775,8 +792,8 @@ class TSDFPlanner:
                 obj_vox = self.habitat2voxel(obj_center)
                 ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
             # plot the target point if found
-            if type(max_point) == Object:
-                ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
+            if type(self.max_point) == Object:
+                ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
             island_high, _ = self.get_island_around_pts(pts, height=1.2)
@@ -796,7 +813,7 @@ class TSDFPlanner:
                 dx, dy = normal * 4
                 ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8,
                           head_length=0.8, color='m')
-            ax3.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax3.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax3.set_title("Unexplored neighbors")
 
             im = ax4.imshow(self.unoccupied)
@@ -806,7 +823,7 @@ class TSDFPlanner:
                 dx, dy = normal * 4
                 ax4.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='white')
             fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
-            ax4.scatter(max_point.position[1], max_point.position[0], c="r", s=30, label="max")
+            ax4.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
             ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1,
                       head_width=0.8, head_length=0.8, color='b')
@@ -841,6 +858,11 @@ class TSDFPlanner:
 
         # Find the yaw angle again
         next_yaw = np.arctan2(direction[1], direction[0]) - np.pi / 2
+
+        if target_arrived:
+            self.max_point = None
+            self.target_point = None
+
         return next_point_normal, next_yaw, next_point, fig
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
