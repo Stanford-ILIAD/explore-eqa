@@ -763,7 +763,7 @@ class TSDFPlanner:
             # this case should not happen actually, since the exploration should end before this
             if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
                 # then just set some random direction
-                direction = np.random.randn(2)
+                direction = self.rad2vector(angle)  # the direction does not change
             else:
                 direction = self.max_point.position - cur_point[:2]
         else:
