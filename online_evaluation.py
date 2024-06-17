@@ -421,6 +421,9 @@ def main(cfg):
                         scene_length = sample.scene_length,
                     )
                     input_ids = sample.input_ids.to("cuda")
+                    if len(torch.where(sample.input_ids==22550)[1]) == 0:
+                        logging.info(f"Question id {question_id} invalid: no token 22550!")
+                        break
                     answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
                     input_ids = input_ids[:, :answer_ind+2]
                     with torch.no_grad():
