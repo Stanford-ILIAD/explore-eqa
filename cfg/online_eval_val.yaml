@@ -39,7 +39,7 @@ extra_view_phase_1: 6
 extra_view_angle_deg_phase_1: 40
 extra_view_phase_2: 8  # in phase 2, have more observations
 extra_view_angle_deg_phase_2: 45
-max_target_observation: 5
+max_target_observation: 10
 
 # Observation filtering
 black_pixel_ratio: 0.2
