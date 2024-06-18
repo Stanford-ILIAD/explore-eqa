@@ -49,6 +49,8 @@ def main(cfg):
     # Load dataset
     questions_list = json.load(open(cfg.questions_list_path, "r"))
 
+    all_explore_dist = []
+
     # Run all questions
     for question_idx, question_data in enumerate(questions_list):
         question_id = question_data['question_id']
@@ -133,8 +135,10 @@ def main(cfg):
         scene_objects = []
         target_found = False
         pts_pixs = np.empty((0, 2))  # for plotting path on the image
+        explore_dist = 0
+        prev_pts = pts.copy()
         for cnt_step in range(num_step):
-            logging.info(f"\n== step: {cnt_step}")
+            logging.info(f"\n== step: {cnt_step}, explore distance: {explore_dist}")
 
             # Save step info and set current pose
             step_name = f"step_{cnt_step}"
@@ -206,6 +210,9 @@ def main(cfg):
                 * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
             ).tolist()
 
+            explore_dist += np.linalg.norm(prev_pts - pts)
+            prev_pts = pts.copy()
+
         all_img_paths = glob.glob(os.path.join(episode_observations_dir, "*.png"))
         # randomly select 50 images
         if len(all_img_paths) > 50:
@@ -214,7 +221,15 @@ def main(cfg):
                 if path not in selected_img_paths:
                     os.remove(path)
 
-        logging.info(f"{question_idx + 1}/{len(questions_list)}")
+        logging.info(f"{question_idx + 1}/{len(questions_list)}, total explore distance: {explore_dist}")
+        all_explore_dist.append(explore_dist)
+
+    logging.info(all_explore_dist)
+    logging.info(f"Average explore distance: {np.mean(all_explore_dist)}")
+    # save all explore distance as pickle
+    with open(os.path.join(str(cfg.output_dir), "all_explore_dist.pkl"), "wb") as f:
+        pickle.dump(all_explore_dist, f)
+
 
 
 
