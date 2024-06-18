@@ -147,9 +147,11 @@ def main(cfg):
         target_obj_id = 0
         episode_data_dir = os.path.join(str(cfg.output_dir), str(question_id))
         episode_observations_dir = os.path.join(episode_data_dir, 'observations')
+        episode_object_observe_dir = os.path.join(episode_data_dir, 'object_observations')
         episode_frontier_dir = os.path.join(episode_data_dir, "frontier_rgb")
         os.makedirs(episode_data_dir, exist_ok=True)
         os.makedirs(episode_observations_dir, exist_ok=True)
+        os.makedirs(episode_object_observe_dir, exist_ok=True)
         os.makedirs(episode_frontier_dir, exist_ok=True)
 
         pts = init_pts
@@ -491,7 +493,7 @@ def main(cfg):
                 obs = simulator.get_sensor_observations()
                 rgb = obs["color_sensor"]
                 plt.imsave(
-                    os.path.join(episode_observations_dir, f"target_{target_observation_count}.png"), rgb
+                    os.path.join(episode_object_observe_dir, f"target_{target_observation_count}.png"), rgb
                 )
                 target_observation_count += 1
                 if target_observation_count >= max_target_observation:
@@ -511,6 +513,14 @@ def main(cfg):
         logging.info(f"{question_idx + 1}/{total_questions}: Success rate: {success_count}/{question_idx + 1}")
         logging.info(f"Mean path length for success exploration: {np.mean(list(path_length_list.values()))}")
         # logging.info(f'Scene {scene_id} finish')
+
+        # ensure that the observation dir has at most 50 images
+        all_img_paths = glob.glob(os.path.join(episode_observations_dir, "*.png"))
+        if len(all_img_paths) > 50:
+            selected_img_paths = random.sample(all_img_paths, 50)
+            for path in all_img_paths:
+                if path not in selected_img_paths:
+                    os.remove(path)
 
     with open(os.path.join(str(cfg.output_dir), "success_list.pkl"), "wb") as f:
         pickle.dump(success_list, f)
