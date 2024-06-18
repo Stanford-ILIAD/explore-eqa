@@ -26,7 +26,7 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.5
-max_step_room_size_ratio: 3
+max_step_room_size_ratio: 5
 black_pixel_ratio: 0.5
 min_random_init_steps: 2
 
