@@ -134,8 +134,11 @@ def main(cfg):
         agent_state = habitat_sim.AgentState()
         logging.info(f"Load scene {scene_id} successfully")
 
-
-        bounding_box_data = json.load(open(os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json"), "r"))
+        bbox_path = os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json")
+        if not os.path.exists(bbox_path):
+            logging.info(f"Question id {scene_id} invalid: no bbox data!")
+            continue
+        bounding_box_data = json.load(open(bbox_path, "r"))
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
 
