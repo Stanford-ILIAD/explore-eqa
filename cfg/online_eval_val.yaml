@@ -8,7 +8,7 @@ scene_data_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_datasets/hm3d/
 semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_obj_bbox_merged'
 # dataset_output_dir: /work/pi_chuangg_umass_edu/yuncong/results/exploration_data
 detection_model_name: "yolo_world/x"
-questions_list_path: 'data/openeqa_filtered_data.json'
+questions_list_path: 'data/openeqa_filtered_data_subset.json'
 scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict
 model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_new.pt
 path_data_dir: exploration_data

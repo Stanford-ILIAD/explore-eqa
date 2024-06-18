@@ -59,6 +59,8 @@ def main(cfg):
     # Load dataset
     questions_list = json.load(open(cfg.questions_list_path, "r"))
     total_questions = len(questions_list)
+    # sort the data according to the question id
+    questions_list = sorted(questions_list, key=lambda x: x['question_id'])
 
     print("load model")
     # Initialize LLaVA model
