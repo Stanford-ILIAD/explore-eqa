@@ -669,10 +669,10 @@ class TSDFPlanner:
         if type(choice) == Object:
             target_point = choice.position
             # # set the object center as the navigation target
-            # target_navigable_point = get_nearest_true_point(target_point, unoccupied)  # get the nearest unoccupied point for the nav target
             # since it's not proper to directly go to the target point,
             # we'd better find a navigable point that is certain distance from it to better observe the target
-            target_navigable_point = get_proper_observe_point(target_point, self.unoccupied, cur_point=cur_point, dist=cfg.final_observe_distance / self._voxel_size)
+            # target_navigable_point = get_proper_observe_point(target_point, self.unoccupied, cur_point=cur_point, dist=cfg.final_observe_distance / self._voxel_size)
+            target_navigable_point = get_random_observe_point(target_point, self.unoccupied, min_dist=15, max_dist=30)
             if target_navigable_point is None:
                 # a wierd case that no unoccupied point is found in all the space
                 logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
@@ -757,20 +757,7 @@ class TSDFPlanner:
         next_point_old = next_point.copy()
         next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
-        # determine the direction: from next point to max point
-        # if np.array_equal(next_point.astype(int), self.max_point.position):  # if the next point is the max point
-        #     # this case should not happen actually, since the exploration should end before this
-        #     if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
-        #         # then just set some random direction
-        #         direction = np.array([
-        #             np.cos(angle + np.pi / 2),
-        #             np.sin(angle + np.pi / 2),
-        #         ])  # the direction does not change
-        #     else:
-        #         direction = self.max_point.position - cur_point[:2]
-        # else:
-        #     # normal direction from next point to max point
-        #     direction = self.max_point.position - next_point
+        # determine the direction
         if target_arrived:  # if the next arriving position is the target point
             if type(self.max_point) == Frontier:
                 direction = self.rad2vector(angle)  # if the target is a frontier, then the agent's orientation does not change
@@ -872,7 +859,7 @@ class TSDFPlanner:
             self.max_point = None
             self.target_point = None
 
-        return next_point_normal, next_yaw, next_point, fig
+        return next_point_normal, next_yaw, next_point, fig, target_arrived
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""

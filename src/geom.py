@@ -390,6 +390,55 @@ def get_proper_observe_point(point, unoccupied_map, cur_point, dist=10):
     final_point = get_nearest_true_point(final_point, unoccupied_map)
     return final_point
 
+def get_random_observe_point(point, unoccupied_map, min_dist=15, max_dist=30):
+    # Get a random observation point between min_dist and max_dist around point
+    # there shouldn't be obstacles between the point and the observation point
+    unoccupied_coords = np.argwhere(unoccupied_map)  # [N, 2]
+    dists = np.linalg.norm(unoccupied_coords - point, axis=1)  # [N]
+    valid_coords = unoccupied_coords[(dists > min_dist) & (dists < max_dist)]  # [N, 2]
+
+    if len(valid_coords) == 0:
+        logging.error(f"Error in get_random_observe_point: no unoccupied points for {min_dist}-{max_dist} distance around point {point}")
+        return None
+    try_count = 0
+    while True:
+        try_count += 1
+        # randomly pick a point, and check its validity
+        idx = random.randint(0, len(valid_coords) - 1)
+        potential_obs_point = valid_coords[idx]
+        # check whether there are false points between the obs point and the target point
+        direction = point - potential_obs_point
+        direction = direction / np.linalg.norm(direction)
+        # adjust the point: usually there are surrounding occupied points around the target object
+        target_point_adjusted = point.copy()
+        try_count = 0
+        while not unoccupied_map[int(target_point_adjusted[0]), int(target_point_adjusted[1])]:
+            try_count += 1
+            target_point_adjusted = target_point_adjusted - direction
+            if try_count > max_dist * 2:
+                logging.error(f"Error in get_random_observe_point: cannot backtrace from {point} to {potential_obs_point}!")
+                return None
+        target_point_adjusted = target_point_adjusted.astype(int)
+        direction = target_point_adjusted - potential_obs_point
+
+        if check_distance(
+            occupied_map=np.logical_not(unoccupied_map),
+            pos=potential_obs_point,
+            direction=direction / np.linalg.norm(direction),
+            tolerance=int(np.linalg.norm(direction)) - 1
+        ):
+            break
+
+        if try_count > 1000:
+            logging.error(f"Error in get_random_observe_point: cannot find a proper observation point! try many tries")
+            return None
+
+    return potential_obs_point
+
+
+
+
+
 def get_warping_gap(angles, tolerance_degree=30, max_try=1000):
     # angles: [N], should be sorted
     tolerance = tolerance_degree / 180 * np.pi
@@ -472,6 +521,8 @@ def adjust_navigation_point(pos, occupied, max_dist=0.5, max_adjust_distance=0.3
 
 def check_distance(occupied_map, pos, direction, tolerance):
     # occupied_map, pos, direction, and tolerance are all in voxel space
+    if tolerance <= 0:
+        return False
     max_steps = tolerance
     all_points = np.round(
         np.linspace(pos, pos + direction * max_steps, max_steps + 1)

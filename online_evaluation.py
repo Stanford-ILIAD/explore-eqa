@@ -486,7 +486,7 @@ def main(cfg):
                 if return_values[0] is None:
                     logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
                     break
-                pts_normal, angle, pts_pix, fig = return_values
+                pts_normal, angle, pts_pix, fig, _ = return_values
 
                 # update the agent's position record
                 pts_pixs = np.vstack((pts_pixs, pts_pix))

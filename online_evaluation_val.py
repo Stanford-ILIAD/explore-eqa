@@ -72,11 +72,14 @@ def main(cfg):
     # model = None
     model.eval()
     print("finish loading model")
-    question_ind = 0
+
+    success_count = 0
+    success_list = []
+    path_length_list = {}
+    max_target_observation = cfg.max_target_observation
 
     # Run all questions
     for question_idx, question_data in enumerate(questions_list):
-        question_ind += 1
         question_id = question_data['question_id']
         question = question_data['question']
 
@@ -88,12 +91,6 @@ def main(cfg):
         init_pts = question_data["position"]
         init_quat = quaternion.quaternion(*question_data["rotation"])
         logging.info(f"\n========\nIndex: {question_idx} Scene: {scene_id}")
-        
-        
-        success_count = 0
-
-        success_list = []
-        path_length_list = []
 
         # load scene
         split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
@@ -153,10 +150,8 @@ def main(cfg):
         pts = init_pts
         angle, axis = quat_to_angle_axis(init_quat)
         angle = angle * axis[1] / np.abs(axis[1])
-        rotation = quat_to_coeffs(
-            quat_from_angle_axis(angle, np.array([0, 1, 0]))
-            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-        ).tolist()
+        rotation = get_quaternion(angle, camera_tilt)
+
         pts_normal = pos_habitat_to_normal(pts)
         floor_height = pts_normal[-1]
         tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
@@ -179,10 +174,6 @@ def main(cfg):
             init_clearance=cfg.init_clearance * 2,
         )
 
-        # Run steps
-        scene_objects = []
-        target_found = False
-
         # record the history of the agent's path
         pts_pixs = np.empty((0, 2))
         pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(pts)[:2]))
@@ -192,7 +183,9 @@ def main(cfg):
         # run steps
         path_length = 0
         prev_pts = pts.copy()
+        target_found = False
         cnt_step = -1
+        target_observation_count = 0
         while cnt_step < num_step - 1:
             cnt_step += 1
             logging.info(f"\n== step: {cnt_step}")
@@ -285,14 +278,6 @@ def main(cfg):
                     margin_h=int(cfg.margin_h_ratio * img_height),
                     margin_w=int(cfg.margin_w_ratio * img_width),
                 )
-
-                if cfg.save_obs:
-                    observation_save_dir = os.path.join(episode_data_dir, 'observations')
-                    os.makedirs(observation_save_dir, exist_ok=True)
-                    if target_found:
-                        plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
-                    else:
-                        plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
 
                 if target_found:
                     break
@@ -462,7 +447,7 @@ def main(cfg):
             if return_values[0] is None:
                 logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
                 break
-            pts_normal, angle, pts_pix, fig = return_values
+            pts_normal, angle, pts_pix, fig, target_arrived = return_values
 
             # update the agent's position record
             pts_pixs = np.vstack((pts_pixs, pts_pix))
@@ -481,18 +466,6 @@ def main(cfg):
                 plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
                 plt.close()
 
-            if cfg.save_frontier_video:
-                frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
-                os.makedirs(frontier_video_path, exist_ok=True)
-                if type(max_point_choice) == Frontier:
-                    img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
-                    os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
-                else:  # navigating to the objects
-                    if cfg.save_obs:
-                        img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
-                        if os.path.exists(img_path):
-                            os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
-
             # update position and rotation
             pts_normal = np.append(pts_normal, floor_height)
             pts = pos_normal_to_habitat(pts_normal)
@@ -502,28 +475,41 @@ def main(cfg):
             path_length += float(np.linalg.norm(pts - prev_pts))
             prev_pts = pts.copy()
 
+            if target_type == "object" and target_arrived:
+                # the model found the target object and arrived at a proper observation point
+                # get an observation and save it
+                # the returned position and orientation should directly point to the target object
+                agent_state_obs = habitat_sim.AgentState()
+                agent_state_obs.position = pts
+                agent_state_obs.rotation = rotation
+                agent.set_state(agent_state_obs)
+                obs = simulator.get_sensor_observations()
+                rgb = obs["color_sensor"]
+                plt.imsave(
+                    os.path.join(episode_observations_dir, f"target_{target_observation_count}.png"), rgb
+                )
+                target_observation_count += 1
+                if target_observation_count >= max_target_observation:
+                    target_found = True
+                    break
 
-            if target_type == "object":
-                logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
-                target_found = True
-                # TODO: save target related frames for gpt-4v
 
         if target_found:
             success_count += 1
             # We only consider samples that model predicts object (use baseline results other samples for now)
             # TODO: you can save path_length in the same format as you did for the baseline
             success_list.append(question_id)
-            path_length_list.append(path_length)
+            path_length_list[question_id] = path_length
             logging.info(f"Question id {question_id} finish with {cnt_step} steps, {path_length} length")
         else:
             logging.info(f"Question id {question_id} failed, {path_length} length")
-        logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
-        logging.info(f"Mean path length for success exploration: {np.mean([x for i, x in enumerate(path_length_list)])}")
+        logging.info(f"{question_idx + 1}/{total_questions}: Success rate: {success_count}/{question_idx + 1}")
+        logging.info(f"Mean path length for success exploration: {np.mean(list(path_length_list.values()))}")
         # logging.info(f'Scene {scene_id} finish')
 
-    with open(os.path.join(cfg.output_dir, "success_list.pkl"), "wb") as f:
+    with open(os.path.join(str(cfg.output_dir), "success_list.pkl"), "wb") as f:
         pickle.dump(success_list, f)
-    with open(os.path.join(cfg.output_dir, "path_length_list.pkl"), "wb") as f:
+    with open(os.path.join(str(cfg.output_dir), "path_length_list.pkl"), "wb") as f:
         pickle.dump(path_length_list, f)
 
     logging.info(f'All scenes finish')
