@@ -56,7 +56,7 @@ def main(cfg):
         # Extract question
         scene_id = question_data["episode_history"]
         init_pts = question_data["position"]
-        init_quat = question_data["rotation"]
+        init_quat = np.array(question_data["rotation"])
         logging.info(f"\n========\nIndex: {question_idx} Scene: {scene_id}")
 
         # load scene
@@ -112,6 +112,7 @@ def main(cfg):
         floor_height = pts_normal[-1]
         tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
         num_step = int(math.sqrt(scene_size) * cfg.max_step_room_size_ratio)
+        num_step = max(num_step, 50)
         logging.info(
             f"Scene size: {scene_size} Floor height: {floor_height} Steps: {num_step}"
         )
