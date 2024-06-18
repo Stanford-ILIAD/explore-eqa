@@ -594,7 +594,7 @@ class TSDFPlanner:
         # remove frontiers that have been changed
         filtered_frontiers = []
         for frontier in self.frontiers:
-            if any(region_equal(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
+            if any(region_equal(frontier.region, new_ft['region'], threshold=cfg.region_equal_threshold) for new_ft in valid_ft_angles):
                 # the frontier is not changed at all
                 filtered_frontiers.append(frontier)
                 # then remove that new frontier
@@ -646,7 +646,7 @@ class TSDFPlanner:
 
         # create new frontiers and add to frontier list
         for ft_data in valid_ft_angles:
-            if not any(region_equal(prev_ft.region, ft_data['region']) for prev_ft in self.frontiers):
+            if not any(region_equal(prev_ft.region, ft_data['region'], threshold=cfg.region_equal_threshold) for prev_ft in self.frontiers):
                 self.frontiers.append(
                     self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                 )
@@ -787,9 +787,10 @@ class TSDFPlanner:
             for obj_center in self.simple_scene_graph.values():
                 obj_vox = self.habitat2voxel(obj_center)
                 ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
-            # plot the target point if found
-            if type(self.max_point) == Object:
-                ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=80, label="target")
+            # plot the position of the target navigation point
+            # if type(self.max_point) == Object:
+            #     ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=80, label="target")
+            ax1.scatter(self.target_point[1], self.target_point[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
             island_high, _ = self.get_island_around_pts(pts, height=1.2)

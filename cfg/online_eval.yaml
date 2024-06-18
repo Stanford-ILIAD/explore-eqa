@@ -32,7 +32,7 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.3
-max_step_room_size_ratio: 5
+max_step_room_size_ratio: 7
 min_random_init_steps: 2
 extra_view_phase_1: 6
 extra_view_angle_deg_phase_1: 40
@@ -75,6 +75,7 @@ planner:
   min_frontier_area: 12  # the frontier should have at least this many pixels
   max_frontier_angle_range_deg: 90  # the angle spanned by the pixels in a frontier should not be larger than this
   min_frontier_angle_diff_deg: 30  # the angle between two frontiers should be larger than this. otherwise, merge them
+  region_equal_threshold: 0.95
 
 visual_prompt:
   cluster_threshold: 1.0
