@@ -56,7 +56,7 @@ def main(cfg):
         # Extract question
         scene_id = question_data["episode_history"]
         init_pts = question_data["position"]
-        init_quat = np.array(question_data["rotation"])
+        init_quat = quaternion.quaternion(*question_data["rotation"])
         logging.info(f"\n========\nIndex: {question_idx} Scene: {scene_id}")
 
         # load scene
@@ -183,22 +183,24 @@ def main(cfg):
                     pts=pts_normal,
                     angle=angle,
                     flag_no_val_weight=cnt_step < cfg.min_random_init_steps,
+                    save_visualization=cfg.save_visualization,
                     **cfg.planner,
                 )
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
                 pts_normal = np.append(pts_normal, floor_height)
                 pts = pos_normal_to_habitat(pts_normal)
 
-                # Add path to ax5, with colormap to indicate order
-                ax5 = fig.axes[4]
-                ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
-                ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
+                if cfg.save_visualization:
+                    # Add path to ax5, with colormap to indicate order
+                    ax5 = fig.axes[4]
+                    ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
+                    ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
 
-                fig.tight_layout()
-                plt.savefig(
-                    os.path.join(episode_data_dir, "{}_map.png".format(cnt_step + 1))
-                )
-                plt.close()
+                    fig.tight_layout()
+                    plt.savefig(
+                        os.path.join(episode_data_dir, "{}_map.png".format(cnt_step + 1))
+                    )
+                    plt.close()
             rotation = quat_to_coeffs(
                 quat_from_angle_axis(angle, np.array([0, 1, 0]))
                 * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))

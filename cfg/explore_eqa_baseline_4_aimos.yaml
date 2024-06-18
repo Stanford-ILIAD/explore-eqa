@@ -8,6 +8,7 @@ scene_data_path: "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d
 questions_list_path: 'data/openeqa_filtered_data.json'
 save_obs: true
 save_freq: 10
+save_visualization: true
 
 # Camera, image
 camera_height: 1.5

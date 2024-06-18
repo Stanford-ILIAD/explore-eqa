@@ -9,6 +9,7 @@ semantic_bbox_data_path: "/home/hanyang/code/3d_project/explore-eqa/data/hm3d_ob
 questions_list_path: 'data/openeqa_filtered_data.json'
 save_obs: true
 save_freq: 10
+save_visualization: true
 
 # Camera, image
 camera_height: 1.5
