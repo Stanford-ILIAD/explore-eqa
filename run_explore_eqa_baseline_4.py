@@ -49,7 +49,7 @@ def main(cfg):
     # Load dataset
     questions_list = json.load(open(cfg.questions_list_path, "r"))
 
-    all_explore_dist = []
+    all_explore_dist = {}
 
     # Run all questions
     for question_idx, question_data in enumerate(questions_list):
@@ -222,10 +222,10 @@ def main(cfg):
                     os.remove(path)
 
         logging.info(f"{question_idx + 1}/{len(questions_list)}, total explore distance: {explore_dist}")
-        all_explore_dist.append(explore_dist)
+        all_explore_dist[question_id] = explore_dist
 
-    logging.info(all_explore_dist)
-    logging.info(f"Average explore distance: {np.mean(all_explore_dist)}")
+    logging.info(all_explore_dist.values())
+    logging.info(f"Average explore distance: {np.mean(list(all_explore_dist.values()))}")
     # save all explore distance as pickle
     with open(os.path.join(str(cfg.output_dir), "all_explore_dist.pkl"), "wb") as f:
         pickle.dump(all_explore_dist, f)
