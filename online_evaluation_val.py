@@ -166,6 +166,7 @@ def main(cfg):
 
         if len(os.listdir(episode_object_observe_dir)) >= max_target_observation:
             logging.info(f"Question id {question_id} already has enough target observations!")
+            success_count += 1
             continue
 
         pts = init_pts
