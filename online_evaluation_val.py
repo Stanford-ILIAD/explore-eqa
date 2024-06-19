@@ -164,7 +164,7 @@ def main(cfg):
         os.makedirs(episode_object_observe_dir, exist_ok=True)
         os.makedirs(episode_frontier_dir, exist_ok=True)
 
-        if len(os.listdir(episode_object_observe_dir)) >= max_target_observation:
+        if len(os.listdir(episode_observations_dir)) >= 50:
             logging.info(f"Question id {question_id} already has enough target observations!")
             success_count += 1
             continue
