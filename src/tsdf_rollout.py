@@ -537,6 +537,7 @@ class TSDFPlanner:
             # this happens when there are stairs on the floor, and the planner cannot handle this situation
             # just skip this question
             logging.error(f'Error in find_next_pose_with_path: frontier area size is 0')
+            self.frontiers = []
             return False
 
         occupied_map_camera = np.logical_not(

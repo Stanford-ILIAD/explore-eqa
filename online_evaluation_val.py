@@ -308,8 +308,7 @@ def main(cfg):
 
             update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
             if not update_success:
-                logging.info(f"Question id {scene_id} invalid: update frontier map failed!")
-                break
+                logging.info("Warning! Update frontier map failed!")
 
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # choose a frontier, and set it as the explore target
