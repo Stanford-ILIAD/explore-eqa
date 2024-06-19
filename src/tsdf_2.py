@@ -154,8 +154,6 @@ class TSDFPlanner:
             self._vol_dim[:2],
         )
 
-        self.target_direction = None
-        self.max_point = None
         self.simple_scene_graph = {}
         self.frontiers: List[Frontier] = []
 
@@ -168,7 +166,7 @@ class TSDFPlanner:
         self.occupied = None
         self.island = None
         self.unexplored_neighbors = None
-        
+
         self.frontiers_weight = None
 
     def update_scene_graph(self, detection_model, rgb, semantic_obs, obj_id_to_name, obj_id_to_bbox, cfg, target_obj_id, return_annotated=False):
@@ -223,9 +221,9 @@ class TSDFPlanner:
                         # add to simple scene graph
                         self.simple_scene_graph[obj_id] = bbox_center
 
-                    adopted_indices.append(i)
                     if obj_id == target_obj_id:
                         target_found = True
+                        adopted_indices.append(i)
 
                     break
 
@@ -242,7 +240,6 @@ class TSDFPlanner:
             annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections)
             annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections)
             return target_found, annotated_image
-
 
     @staticmethod
     @njit(parallel=True)
@@ -590,7 +587,7 @@ class TSDFPlanner:
         # remove frontiers that have been changed
         filtered_frontiers = []
         for frontier in self.frontiers:
-            if any(region_equal(frontier.region, new_ft['region'], threshold=0.95) for new_ft in valid_ft_angles):
+            if any(region_equal(frontier.region, new_ft['region'], threshold=cfg.region_equal_threshold) for new_ft in valid_ft_angles):
                 # the frontier is not changed at all
                 filtered_frontiers.append(frontier)
                 # then remove that new frontier
@@ -638,7 +635,7 @@ class TSDFPlanner:
 
         # create new frontiers and add to frontier list
         for ft_data in valid_ft_angles:
-            if not any(region_equal(prev_ft.region, ft_data['region']) for prev_ft in self.frontiers):
+            if not any(region_equal(prev_ft.region, ft_data['region'], threshold=cfg.region_equal_threshold) for prev_ft in self.frontiers):
                 self.frontiers.append(
                     self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                 )
@@ -772,7 +769,7 @@ class TSDFPlanner:
                 if try_count > 1000:
                     logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point")
                     return (None,)
-            
+
             next_point = next_point.astype(int)
         else:
             logging.error(f"Error in find_next_pose_with_path: wrong choice type: {type(choice)}")
@@ -786,11 +783,13 @@ class TSDFPlanner:
         max_dist_from_cur = get_proper_step_length(dist, max_dist_from_cur, 1.5, 3, 4.5)
 
         if dist > max_dist_from_cur:
+            target_arrived = False
             if path_to_target is not None:
                 # drop the y value of the path to avoid errors when calculating seg_length
                 path_to_target = [np.asarray([p[0], 0.0, p[2]]) for p in path_to_target]
                 # if the pathfinder find a path, then just walk along the path for max_dist_from_cur distance
                 dist_to_travel = max_dist_from_cur
+                middle_point_found = False
                 for i in range(len(path_to_target) - 1):
                     seg_length = np.linalg.norm(path_to_target[i + 1] - path_to_target[i])
                     if seg_length < dist_to_travel:
@@ -799,12 +798,19 @@ class TSDFPlanner:
                         # find the point on the segment according to the length ratio
                         next_point_habitat = path_to_target[i] + (path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
                         next_point = self.world2vox(pos_habitat_to_normal(next_point_habitat))[:2]
+                        middle_point_found = True
                         break
+                if not middle_point_found:
+                    # this is a very rare case that, the sum of the segment lengths is smaller than the dist returned by the pathfinder
+                    # and meanwhile the max_dist_from_cur larger than the sum of the segment lengths
+                    # resulting that the previous code cannot find a proper point in the middle of the path
+                    # in this case, just keep the next point unchanged
+                    target_arrived = True
             else:
                 # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
                 walk_dir = next_point - cur_point[:2]
                 walk_dir = walk_dir / np.linalg.norm(walk_dir)
-                next_point = cur_point[:2] + (next_point - cur_point[:2]) * max_dist_from_cur / dist
+                next_point = cur_point[:2] + walk_dir * max_dist_from_cur
                 # ensure next point is valid, otherwise go backward a bit
                 try_count = 0
                 while (
@@ -812,27 +818,30 @@ class TSDFPlanner:
                     or not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                     or self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                 ):
-                    next_point -= walk_dir * 0.3 / self._voxel_size
+                    next_point -= walk_dir
                     try_count += 1
                     if try_count > 1000:
                         logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point")
                         return (None,)
                 next_point = np.round(next_point).astype(int)
+        else:
+            target_arrived = True
 
         next_point_old = next_point.copy()
         next_point = adjust_navigation_point(next_point, self.occupied, voxel_size=self._voxel_size, max_adjust_distance=0.1)
 
-        # determine the direction: from next point to max point
-        if np.array_equal(next_point.astype(int), max_point.position):  # if the next point is the max point
-            # this case should not happen actually, since the exploration should end before this
-            if np.array_equal(cur_point[:2], next_point):  # if the current point is also the max point
-                # then just set some random direction
-                direction = np.random.randn(2)
+        # determine the direction
+        if target_arrived:  # if the next arriving position is the target point
+            if type(max_point) == Frontier:
+                direction = self.rad2vector(angle)  # if the target is a frontier, then the agent's orientation does not change
             else:
-                direction = max_point.position - cur_point[:2]
-        else:
-            # normal direction from next point to max point
-            direction = max_point.position - next_point
+                direction = max_point.position - cur_point[:2]  # if the target is an object, then the agent should face the object
+        else:  # the agent is still on the way to the target point
+            direction = next_point - cur_point[:2]
+        if np.linalg.norm(direction) < 1e-6:  # this is a rare case that next point is the same as the current point
+            # usually this is a problem in the pathfinder
+            logging.warning(f"Warning in agent_step: next point is the same as the current point when determining the direction")
+            direction = self.rad2vector(angle)
         direction = direction / np.linalg.norm(direction)
 
         # mark the max point as visited if it is a frontier
@@ -929,8 +938,6 @@ class TSDFPlanner:
         updated_path_points = self.update_path_points(path_points, next_point_normal)
 
         return next_point_normal, next_yaw, next_point, fig, updated_path_points
-
-
 
     def get_island_around_pts(self, pts, fill_dim=0.4, height=0.4):
         """Find the empty space around the point (x,y,z) in the world frame"""

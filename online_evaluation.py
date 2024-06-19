@@ -24,7 +24,6 @@ from tqdm import tqdm
 import habitat_sim
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
-    make_simple_cfg,
     make_semantic_cfg,
     pos_normal_to_habitat,
     pos_habitat_to_normal,
@@ -42,6 +41,14 @@ from llava.model.builder import load_pretrained_model
 from llava.mm_utils import get_model_name_from_path
 
 from easydict import EasyDict
+
+
+'''
+This code run rollouts on our synthesized evaluation dataset.
+It adopts the stop criteria similar to the one in data collector: the target object is detected in the view and occupies certain pixels.
+This code only tests the model's ability to navigate to the target object, not the ability to answer questions,
+and the results should be compared with baseline 1, 2 and 3.
+'''
 
 
 def main(cfg):

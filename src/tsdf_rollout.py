@@ -78,12 +78,12 @@ class TSDFPlanner:
     """
 
     def __init__(
-            self,
-            vol_bnds,
-            voxel_size,
-            floor_height_offset=0,
-            pts_init=None,
-            init_clearance=0,
+        self,
+        vol_bnds,
+        voxel_size,
+        floor_height_offset=0,
+        pts_init=None,
+        init_clearance=0,
     ):
         """Constructor.
         Args:
@@ -180,8 +180,7 @@ class TSDFPlanner:
         unique_obj_ids = np.unique(semantic_obs)
         class_to_obj_id = {}
         for obj_id in unique_obj_ids:
-            if obj_id == 0 or obj_id not in obj_id_to_name.keys() or obj_id_to_name[obj_id] in ['wall', 'floor',
-                                                                                                'ceiling']:
+            if obj_id == 0 or obj_id not in obj_id_to_name.keys() or obj_id_to_name[obj_id] in ['wall', 'floor', 'ceiling']:
                 continue
             if obj_id_to_name[obj_id] not in class_to_obj_id.keys():
                 class_to_obj_id[obj_id_to_name[obj_id]] = [obj_id]
@@ -302,10 +301,10 @@ class TSDFPlanner:
         return tsdf_vol_int, w_new
 
     def integrate_sem(
-            self,
-            sem_pix,
-            radius=1.0,  # meter
-            obs_weight=1.0,
+        self,
+        sem_pix,
+        radius=1.0,  # meter
+        obs_weight=1.0,
     ):
         """Add semantic value to the 2D map by marking a circle of specified radius"""
         assert len(self.candidates) == len(sem_pix)
@@ -316,21 +315,21 @@ class TSDFPlanner:
                 w_old = self._weight_val_vol_cpu[pt[0], pt[1]].copy()
                 self._weight_val_vol_cpu[pt[0], pt[1]] += obs_weight
                 self._val_vol_cpu[pt[0], pt[1]] = (
-                                                          w_old * self._val_vol_cpu[pt[0], pt[1]]
-                                                          + obs_weight * sem_pix[p_ind]
-                                                  ) / self._weight_val_vol_cpu[pt[0], pt[1]]
+                    w_old * self._val_vol_cpu[pt[0], pt[1]]
+                    + obs_weight * sem_pix[p_ind]
+                ) / self._weight_val_vol_cpu[pt[0], pt[1]]
 
     def integrate(
-            self,
-            color_im,
-            depth_im,
-            cam_intr,
-            cam_pose,
-            sem_im=None,
-            w_new=None,
-            obs_weight=1.0,
-            margin_h=240,  # from top
-            margin_w=120,  # each side
+        self,
+        color_im,
+        depth_im,
+        cam_intr,
+        cam_pose,
+        sem_im=None,
+        w_new=None,
+        obs_weight=1.0,
+        margin_h=240,  # from top
+        margin_w=120,  # each side
     ):
         """Integrate an RGB-D frame into the TSDF volume.
         Args:
@@ -567,8 +566,7 @@ class TSDFPlanner:
 
             # get the range of the angles
             angle_range = get_angle_span(angle_cluster)
-            warping_gap = get_warping_gap(
-                angle_cluster)  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
+            warping_gap = get_warping_gap(angle_cluster)  # add 2pi to angles that smaller than this to avoid angles crossing -pi/pi line
             if warping_gap is not None:
                 angle_cluster[angle_cluster < warping_gap] += 2 * np.pi
 
@@ -610,16 +608,15 @@ class TSDFPlanner:
                     ang = valid_ft_angles[update_ft_idx]['angle']
                     # if the new frontier has no valid observations
                     if 1 > self._voxel_size * get_collision_distance(
-                            occupied_map=occupied_map_camera,
-                            pos=cur_point,
-                            direction=np.array([np.cos(ang), np.sin(ang)])
+                        occupied_map=occupied_map_camera,
+                        pos=cur_point,
+                        direction=np.array([np.cos(ang), np.sin(ang)])
                     ):
                         # create a new frontier with the old image
                         old_img_path = frontier.image
                         old_img_feature = frontier.feature
                         filtered_frontiers.append(
-                            self.create_frontier(valid_ft_angles[update_ft_idx],
-                                                 frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
+                            self.create_frontier(valid_ft_angles[update_ft_idx], frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                         )
                         filtered_frontiers[-1].image = old_img_path
                         filtered_frontiers[-1].feature = old_img_feature
@@ -637,8 +634,7 @@ class TSDFPlanner:
                     next_angle = valid_ft_angles[0]
                     if next_angle['angle'] - cur_angle['angle'] < cfg.min_frontier_angle_diff_deg * np.pi / 180:
                         # merge the two
-                        weight = np.sum(cur_angle['region']) / (
-                                    np.sum(cur_angle['region']) + np.sum(next_angle['region']))
+                        weight = np.sum(cur_angle['region']) / (np.sum(cur_angle['region']) + np.sum(next_angle['region']))
                         cur_angle['angle'] = cur_angle['angle'] * weight + next_angle['angle'] * (1 - weight)
                         cur_angle['region'] = cur_angle['region'] | next_angle['region']
                         valid_ft_angles.pop(0)
@@ -688,9 +684,9 @@ class TSDFPlanner:
             next_point = np.array(self.max_point.position, dtype=float)
             try_count = 0
             while (
-                    not self.check_within_bnds(next_point.astype(int)) or
-                    self.occupied[int(next_point[0]), int(next_point[1])] or
-                    not self.island[int(next_point[0]), int(next_point[1])]
+                not self.check_within_bnds(next_point.astype(int)) or
+                self.occupied[int(next_point[0]), int(next_point[1])] or
+                not self.island[int(next_point[0]), int(next_point[1])]
             ):
                 next_point -= ft_direction
                 try_count += 1
@@ -745,6 +741,7 @@ class TSDFPlanner:
                     # resulting that the previous code cannot find a proper point in the middle of the path
                     # in this case, just go to the target point
                     next_point = self.target_point.copy()
+                    target_arrived = True
             else:
                 # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
                 walk_dir = self.target_point - cur_point[:2]
@@ -752,9 +749,9 @@ class TSDFPlanner:
                 next_point = cur_point[:2] + walk_dir * max_dist_from_cur
                 # ensure next point is valid, otherwise go backward a bit
                 while (
-                        not self.check_within_bnds(next_point)
-                        or not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
-                        or self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
+                    not self.check_within_bnds(next_point)
+                    or not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
+                    or self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                 ):
                     next_point -= walk_dir
                 next_point = np.round(next_point).astype(int)
@@ -791,8 +788,7 @@ class TSDFPlanner:
             ax1.imshow(self.unoccupied)
             ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax1.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-            ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1,
-                      head_width=0.8, head_length=0.8, color='b')
+            ax1.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
             ax1.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
             ax1.scatter(next_point_old[1], next_point_old[0], c="y", s=30, label="old")
             # plot all the detected objects
@@ -820,8 +816,7 @@ class TSDFPlanner:
                 ax3.scatter(frontier.position[1], frontier.position[0], color="m", s=10, alpha=1)
                 normal = frontier.orientation
                 dx, dy = normal * 4
-                ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8,
-                          head_length=0.8, color='m')
+                ax3.arrow(frontier.position[1], frontier.position[0], dy, dx, width=0.1, head_width=0.8, head_length=0.8, color='m')
             ax3.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax3.set_title("Unexplored neighbors")
 
@@ -834,8 +829,7 @@ class TSDFPlanner:
             fig.colorbar(im, orientation="vertical", ax=ax4, fraction=0.046, pad=0.04)
             ax4.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=30, label="max")
             ax4.scatter(cur_point[1], cur_point[0], c="b", s=30, label="current")
-            ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1,
-                      head_width=0.8, head_length=0.8, color='b')
+            ax4.arrow(cur_point[1], cur_point[0], agent_orientation[1] * 4, agent_orientation[0] * 4, width=0.1, head_width=0.8, head_length=0.8, color='b')
             ax4.scatter(next_point[1], next_point[0], c="g", s=30, label="actual")
             ax4.scatter(next_point_old[1], next_point_old[0], c="y", s=30, label="old")
             ax4.quiver(

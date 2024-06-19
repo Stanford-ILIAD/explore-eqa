@@ -58,6 +58,7 @@ def main(cfg):
     with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
         questions_data = json.load(f)
     all_scene_list = list(set([q["episode_history"] for q in questions_data]))
+    random.shuffle(all_scene_list)
     logging.info(f"Loaded {len(questions_data)} questions.")
 
     # for each scene, answer each question
@@ -70,11 +71,11 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
-        if len(all_questions_in_scene) == 0:
-            continue
+        # all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
+        # if len(all_questions_in_scene) == 0:
+        #     continue
         # random.shuffle(all_questions_in_scene)
-        # all_questions_in_scene = all_questions_in_scene[:2]
+        # all_questions_in_scene = all_questions_in_scene
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
@@ -84,7 +85,8 @@ def main(cfg):
         navmesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
         semantic_texture_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.glb")
         scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
-        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
+        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path), f'{scene_mesh_path}, {navmesh_path}'
+        assert os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path), f'{semantic_texture_path}, {scene_semantic_annotation_path}'
 
         try:
             del tsdf_planner
@@ -122,9 +124,20 @@ def main(cfg):
 
         for question_data in all_questions_in_scene:
             question_ind += 1
+            floor_height_curr = question_data['position'][1]
 
-            # first run a random question to initialize the scene
-            prev_question_data = random.choice(all_questions_in_scene)
+            # randomly select another question in the scene to initialize
+            try_count = 0
+            while True:
+                # the question data should not be the same as the current one
+                # and should be on the same floor
+                try_count += 1
+                prev_question_data = random.choice(all_questions_in_scene)
+                if (prev_question_data['question_id'] != question_data['question_id'] and
+                    np.abs(prev_question_data['position'][1] - floor_height_curr) < 0.1):
+                    break
+                if try_count > 1000:
+                    break
 
             target_obj_id = prev_question_data['object_id']
             target_position = prev_question_data['position']
@@ -175,7 +188,7 @@ def main(cfg):
                 vol_bnds=tsdf_bnds,
                 voxel_size=cfg.tsdf_grid_size,
                 floor_height_offset=0,
-                pts_init=pos_habitat_to_normal(start_position),
+                pts_init=pts_normal,
                 init_clearance=cfg.init_clearance * 2,
             )
 
@@ -309,6 +322,19 @@ def main(cfg):
 
                     if target_found:
                         break
+
+                if cfg.save_visualization_prev:
+                    tsdf_values = tsdf_planner._tsdf_vol_cpu[:, :, 4]  # (h, w), float
+                    # save the value as image
+                    visualization_path = os.path.join(episode_data_dir, "visualization")
+                    os.makedirs(visualization_path, exist_ok=True)
+                    im = plt.imshow(tsdf_values)
+                    plt.colorbar(im, orientation='vertical')
+                    plt.savefig(
+                        os.path.join(visualization_path, f"prev_{cnt_step}_tsdf_value.png")
+                    )
+                    plt.close()
+
 
                 update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
                 if not update_success:
@@ -617,6 +643,16 @@ def main(cfg):
                 if target_found:
                     break
 
+                if cfg.save_visualization:
+                    tsdf_values = tsdf_planner._tsdf_vol_cpu[:, :, 4]  # (h, w), float
+                    # save the value as image
+                    im = plt.imshow(tsdf_values)
+                    plt.colorbar(im, orientation='vertical')
+                    plt.savefig(
+                        os.path.join(visualization_path, f"{cnt_step}_tsdf_value.png")
+                    )
+                    plt.close()
+
                 # record current scene graph
                 step_dict["scene_graph"] = list(tsdf_planner.simple_scene_graph.keys())
                 step_dict["scene_graph"] = [int(x) for x in step_dict["scene_graph"]]
@@ -793,9 +829,6 @@ if __name__ == "__main__":
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
     if not os.path.exists(cfg.output_dir):
         os.makedirs(cfg.output_dir, exist_ok=True)  # recursive
-    cfg.frontier_dir = os.path.join(cfg.output_dir, "frontier")
-    if not os.path.exists(cfg.frontier_dir):
-        os.makedirs(cfg.frontier_dir, exist_ok=True)  # recursive
     if not os.path.exists(cfg.dataset_output_dir):
         os.makedirs(cfg.dataset_output_dir, exist_ok=True)
     logging_path = os.path.join(cfg.output_dir, "log.log")
