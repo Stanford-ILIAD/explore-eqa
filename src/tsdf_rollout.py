@@ -729,6 +729,7 @@ class TSDFPlanner:
                 path_to_target = [np.asarray([p[0], 0.0, p[2]]) for p in path_to_target]
                 # if the pathfinder find a path, then just walk along the path for max_dist_from_cur distance
                 dist_to_travel = max_dist_from_cur
+                next_point = None
                 for i in range(len(path_to_target) - 1):
                     seg_length = np.linalg.norm(path_to_target[i + 1] - path_to_target[i])
                     if seg_length < dist_to_travel:
@@ -738,6 +739,12 @@ class TSDFPlanner:
                         next_point_habitat = path_to_target[i] + (path_to_target[i + 1] - path_to_target[i]) * dist_to_travel / seg_length
                         next_point = self.world2vox(pos_habitat_to_normal(next_point_habitat))[:2]
                         break
+                if next_point is None:
+                    # this is a very rare case that, the sum of the segment lengths is smaller than the dist returned by the pathfinder
+                    # and meanwhile the max_dist_from_cur larger than the sum of the segment lengths
+                    # resulting that the previous code cannot find a proper point in the middle of the path
+                    # in this case, just go to the target point
+                    next_point = self.target_point.copy()
             else:
                 # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
                 walk_dir = self.target_point - cur_point[:2]

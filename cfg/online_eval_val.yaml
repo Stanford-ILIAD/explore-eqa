@@ -24,7 +24,7 @@ margin_w_ratio: 0.25
 margin_h_ratio: 0.6
 
 save_obs: true
-save_visualization: true
+save_visualization: false
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
