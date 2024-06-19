@@ -411,13 +411,17 @@ def get_random_observe_point(point, unoccupied_map, min_dist=15, max_dist=30):
         direction = direction / np.linalg.norm(direction)
         # adjust the point: usually there are surrounding occupied points around the target object
         target_point_adjusted = point.copy()
-        try_count = 0
+        try_count_step_back = 0
+        adjust_success = True
         while not unoccupied_map[int(target_point_adjusted[0]), int(target_point_adjusted[1])]:
-            try_count += 1
+            try_count_step_back += 1
             target_point_adjusted = target_point_adjusted - direction
-            if try_count > max_dist * 2:
+            if try_count_step_back > max_dist * 2:
                 logging.error(f"Error in get_random_observe_point: cannot backtrace from {point} to {potential_obs_point}!")
-                return None
+                adjust_success = False
+                break
+        if not adjust_success:
+            continue
         target_point_adjusted = target_point_adjusted.astype(int)
         direction = target_point_adjusted - potential_obs_point
 
