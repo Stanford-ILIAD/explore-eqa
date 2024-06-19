@@ -75,9 +75,19 @@ def main(cfg):
     model.eval()
     print("finish loading model")
 
+    # load success list and path length list
+    if os.path.exists(os.path.join(str(cfg.output_dir), "success_list.pkl")):
+        with open(os.path.join(str(cfg.output_dir), "success_list.pkl"), "rb") as f:
+            success_list = pickle.load(f)
+    else:
+        success_list = []
+    if os.path.exists(os.path.join(str(cfg.output_dir), "path_length_list.pkl")):
+        with open(os.path.join(str(cfg.output_dir), "path_length_list.pkl"), "rb") as f:
+            path_length_list = pickle.load(f)
+    else:
+        path_length_list = {}
+
     success_count = 0
-    success_list = []
-    path_length_list = {}
     max_target_observation = cfg.max_target_observation
 
     # Run all questions
@@ -153,6 +163,10 @@ def main(cfg):
         os.makedirs(episode_observations_dir, exist_ok=True)
         os.makedirs(episode_object_observe_dir, exist_ok=True)
         os.makedirs(episode_frontier_dir, exist_ok=True)
+
+        if len(os.listdir(episode_object_observe_dir)) >= max_target_observation:
+            logging.info(f"Question id {question_id} already has enough target observations!")
+            continue
 
         pts = init_pts
         angle, axis = quat_to_angle_axis(init_quat)
@@ -504,7 +518,8 @@ def main(cfg):
             success_count += 1
             # We only consider samples that model predicts object (use baseline results other samples for now)
             # TODO: you can save path_length in the same format as you did for the baseline
-            success_list.append(question_id)
+            if question_id not in success_list:
+                success_list.append(question_id)
             path_length_list[question_id] = path_length
             logging.info(f"Question id {question_id} finish with {cnt_step} steps, {path_length} length")
         else:
@@ -520,6 +535,11 @@ def main(cfg):
             for path in all_img_paths:
                 if path not in selected_img_paths:
                     os.remove(path)
+
+        with open(os.path.join(str(cfg.output_dir), "success_list.pkl"), "wb") as f:
+            pickle.dump(success_list, f)
+        with open(os.path.join(str(cfg.output_dir), "path_length_list.pkl"), "wb") as f:
+            pickle.dump(path_length_list, f)
 
     with open(os.path.join(str(cfg.output_dir), "success_list.pkl"), "wb") as f:
         pickle.dump(success_list, f)
