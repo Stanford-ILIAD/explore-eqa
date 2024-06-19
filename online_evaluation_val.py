@@ -199,7 +199,7 @@ def main(cfg):
         pts_pixs = np.empty((0, 2))
         pts_pixs = np.vstack((pts_pixs, tsdf_planner.habitat2voxel(pts)[:2]))
 
-        logging.info(f'\n\nQuestion id {scene_id} initialization successful!')
+        logging.info(f'\n\nQuestion id {question_id} initialization successful!')
 
         # run steps
         path_length = 0

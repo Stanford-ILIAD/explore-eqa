@@ -766,6 +766,10 @@ class TSDFPlanner:
                 direction = self.max_point.position - cur_point[:2]  # if the target is an object, then the agent should face the object
         else:  # the agent is still on the way to the target point
             direction = next_point - cur_point[:2]
+        if np.linalg.norm(direction) < 1e-6:  # this is a rare case that next point is the same as the current point
+            # usually this is a problem in the pathfinder
+            logging.warning(f"Warning in agent_step: next point is the same as the current point when determining the direction")
+            direction = self.rad2vector(angle)
         direction = direction / np.linalg.norm(direction)
 
         # mark the max point as visited if it is a frontier
