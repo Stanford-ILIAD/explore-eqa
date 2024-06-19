@@ -1179,9 +1179,20 @@ class TSDFPlanner:
         all_direction_norm = np.linalg.norm(all_directions, axis=1, keepdims=True)
         all_direction_norm = np.where(all_direction_norm == 0, np.inf, all_direction_norm)
         all_directions = all_directions / all_direction_norm
-        center = frontier_edge_areas[
-            np.argmax(np.dot(all_directions, ft_direction))
+
+        # the center is the closest point in the edge areas from current point that have close cosine angles
+        cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
+        center_candidates = np.asarray(
+            [frontier_edge_areas[idx] for idx in cos_sim_rank[:5]]
+        )
+        center = center_candidates[
+            np.argmin(np.linalg.norm(center_candidates - cur_point[:2], axis=1))
         ]
+
+        # center = frontier_edge_areas[
+        #     np.argmax(np.dot(all_directions, ft_direction))
+        # ]
+
         # cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
         # # the center is the farthest point in the closest three points
         # center_candidates = np.asarray(
