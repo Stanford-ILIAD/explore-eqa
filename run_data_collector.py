@@ -1,6 +1,5 @@
 import os
 import random
-
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HABITAT_SIM_LOG"] = (
@@ -18,6 +17,7 @@ import glob
 import math
 import quaternion
 import matplotlib.pyplot as plt
+import matplotlib.image
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
@@ -34,14 +34,6 @@ from src.habitat import (
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf import TSDFPlanner, Frontier, Object
 from inference.models import YOLOWorld
-
-
-
-def get_info(pathfinder, pos):
-    is_navigable = pathfinder.is_navigable(pos)
-    hit_record = pathfinder.closest_obstacle_surface_point(pos, 0.5)
-    dist = hit_record.hit_dist
-    return is_navigable, dist
 
 
 def main(cfg):
@@ -72,7 +64,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
+        all_questions_in_scene = [q for q in all_questions_in_scene if '00009-vLpv2VX547B_68_printer' in q['question_id']]
         if len(all_questions_in_scene) == 0:
             continue
         # random.shuffle(all_questions_in_scene)
@@ -86,7 +78,8 @@ def main(cfg):
         navmesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
         semantic_texture_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.glb")
         scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
-        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path) and os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path)
+        assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path), f'{scene_mesh_path}, {navmesh_path}'
+        assert os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path), f'{semantic_texture_path}, {scene_semantic_annotation_path}'
 
         try:
             del tsdf_planner
@@ -215,9 +208,10 @@ def main(cfg):
 
                 # run steps
                 target_found = False
-                num_step = int(travel_dist * cfg.max_step_dist_ratio)
+                max_explore_dist = travel_dist * cfg.max_step_dist_ratio
+                explore_dist = 0.0
                 cnt_step = -1
-                while cnt_step < num_step - 1:
+                while explore_dist < max_explore_dist and cnt_step < 30:
                     cnt_step += 1
 
                     step_dict = {}
@@ -245,8 +239,16 @@ def main(cfg):
                     occupied_map = np.logical_not(unoccupied_map)
 
                     # observe and update the TSDF
+                    keep_forward_observation = False
+                    observation_kept_count = 0
                     for view_idx, ang in enumerate(all_angles):
-                        # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+                        if cnt_step == 0:
+                            keep_forward_observation = True  # at the first exploration step, always keep the forward observation
+                        if view_idx == total_views - 1 and observation_kept_count == 0:
+                            keep_forward_observation = True  # if all previous observation is invalid, then we have to keep the forward one
+                        if pts_pixs.shape[0] >= 3:
+                            if np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) < 1e-3 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) < 1e-3:
+                                keep_forward_observation = True  # the agent is stuck somehow
 
                         # check whether current view is valid
                         collision_dist = tsdf_planner._voxel_size * get_collision_distance(
@@ -254,9 +256,10 @@ def main(cfg):
                             pos=tsdf_planner.habitat2voxel(pts),
                             direction=tsdf_planner.rad2vector(ang)
                         )
-                        if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
-                            # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
-                            continue
+                        if collision_dist < cfg.collision_dist:
+                            if not (view_idx == total_views - 1 and keep_forward_observation):
+                                # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                                continue
 
                         agent_state.position = pts
                         agent_state.rotation = get_quaternion(ang, camera_tilt)
@@ -287,9 +290,10 @@ def main(cfg):
                         positive_depth = depth[depth > 0]
                         if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
                             keep_observation = False
-                        if not keep_observation and view_idx != total_views - 1:
-                            # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
-                            continue
+                        if not keep_observation:
+                            if not (view_idx == total_views - 1 and keep_forward_observation):
+                                # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                                continue
 
                         # construct an frequency count map of each semantic id to a unique id
                         target_in_view, annotated_rgb = tsdf_planner.update_scene_graph(
@@ -334,14 +338,13 @@ def main(cfg):
                                 plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
                             else:
                                 plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
-                            # semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
-                            # semantic_img.putpalette(d3_40_colors_rgb.flatten())
-                            # semantic_img.putdata((semantic_obs.flatten() % 40).astype(np.uint8))
-                            # semantic_img = semantic_img.convert("RGBA")
-                            # if target_found:
-                            #     semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-semantic-target.png"))
-                            # else:
-                            #     semantic_img.save(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}--semantic.png"))
+
+                        if cfg.save_egocentric_view and view_idx == total_views - 1:
+                            egocentric_save_dir = os.path.join(episode_data_dir, 'egocentric')
+                            os.makedirs(egocentric_save_dir, exist_ok=True)
+                            plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}.png"), rgb)
+
+                        observation_kept_count += 1
 
                         if target_found:
                             break
@@ -349,32 +352,11 @@ def main(cfg):
                     if target_found:
                         break
 
-                    if target_obj_id in tsdf_planner.simple_scene_graph.keys():
-                        # if the target object is in the scene graph, give more steps to allow slowly moving to the target
-                        num_step = int(travel_dist * (cfg.max_step_dist_ratio + 0.5))
-
                     # record current scene graph
                     step_dict["scene_graph"] = list(tsdf_planner.simple_scene_graph.keys())
                     step_dict["scene_graph"] = [int(x) for x in step_dict["scene_graph"]]
 
                     step_dict["frontiers"] = []
-
-                    # # determine the next point and move the agent
-                    # return_values = tsdf_planner.find_next_pose_with_path(
-                    #     pts=pts_normal,
-                    #     angle=angle,
-                    #     path_points=path_points,
-                    #     pathfinder=pathfinder,
-                    #     target_obj_id=target_obj_id,
-                    #     cfg=cfg.planner,
-                    #     save_visualization=cfg.save_visualization,
-                    #     return_choice=True
-                    # )
-                    # if return_values[0] is None:
-                    #     logging.info(f"Question id {question_data['question_id']}-path {path_idx} invalid!")
-                    #     break
-                    #
-                    # pts_normal, angle, pts_pix, fig, path_points, max_point_choice = return_values
 
                     update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
                     if not update_success:
@@ -486,21 +468,42 @@ def main(cfg):
                     if cfg.save_frontier_video:
                         frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
                         os.makedirs(frontier_video_path, exist_ok=True)
-                        if type(max_point_choice) == Frontier:
-                            img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
-                            os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
-                        else:  # navigating to the objects
-                            if cfg.save_obs:
-                                img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
-                                if os.path.exists(img_path):
-                                    os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
+                        # if type(max_point_choice) == Frontier:
+                        #     img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
+                        #     os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
+                        # else:  # navigating to the objects
+                        #     if cfg.save_obs:
+                        #         img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
+                        #         if os.path.exists(img_path):
+                        #             os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
+                        num_images = len(tsdf_planner.frontiers)
+                        side_length = int(np.sqrt(num_images)) + 1
+                        fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                        for h_idx in range(side_length):
+                            for w_idx in range(side_length):
+                                axs[h_idx, w_idx].axis('off')
+                                i = h_idx * side_length + w_idx
+                                if i < num_images:
+                                    img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                    img = matplotlib.image.imread(img_path)
+                                    axs[h_idx, w_idx].imshow(img)
+                                    if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                        axs[h_idx, w_idx].set_title('Chosen')
+                        global_caption = f"{question_data['question']}\n{question_data['answer']}"
+                        if type(max_point_choice) == Object:
+                            global_caption += '\nToward target object'
+                        fig.suptitle(global_caption, fontsize=16)
+                        plt.tight_layout(rect=(0., 0., 1., 0.95))
+                        plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
+                        plt.close()
 
                     # update position and rotation
                     pts_normal = np.append(pts_normal, floor_height)
                     pts = pos_normal_to_habitat(pts_normal)
                     rotation = get_quaternion(angle, camera_tilt)
+                    explore_dist += np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) * tsdf_planner._voxel_size
 
-                    logging.info(f"Current position: {pts}")
+                    logging.info(f"Current position: {pts}, {explore_dist:.3f}/{max_explore_dist:.3f}")
 
                 if target_found:
                     metadata["episode_length"] = cnt_step
@@ -543,9 +546,6 @@ if __name__ == "__main__":
     cfg.output_dir = os.path.join(cfg.output_parent_dir, cfg.exp_name)
     if not os.path.exists(cfg.output_dir):
         os.makedirs(cfg.output_dir, exist_ok=True)  # recursive
-    cfg.frontier_dir = os.path.join(cfg.output_dir, "frontier")
-    if not os.path.exists(cfg.frontier_dir):
-        os.makedirs(cfg.frontier_dir, exist_ok=True)  # recursive
     if not os.path.exists(cfg.dataset_output_dir):
         os.makedirs(cfg.dataset_output_dir, exist_ok=True)
     logging_path = os.path.join(cfg.output_dir, "log.log")

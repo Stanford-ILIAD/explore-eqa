@@ -597,27 +597,32 @@ class TSDFPlanner:
                 # the frontier is not changed (almost)
                 filtered_frontiers.append(frontier)
                 kept_frontier_area = kept_frontier_area | frontier.region
+                frontier_appended = True
                 # then remove that new frontier
                 ft_idx = np.argmax(IoU_values)
                 valid_ft_angles.pop(ft_idx)
-                frontier_appended = True
-            elif np.sum(IoU_values > 0.1) >= 2 and cfg.region_equal_threshold < np.sum(IoU_values[IoU_values > 0.1]) <= 1:
+            elif np.sum(IoU_values > 0.02) >= 2 and cfg.region_equal_threshold < np.sum(IoU_values[IoU_values > 0.02]) <= 1:
                 # if one old frontier is split into two new frontiers, and their sizes are equal
                 # then keep the old frontier
-                logging.debug(f"Frontier one split to many: {IoU_values[IoU_values > 0.1]}")
+                logging.debug(f"Frontier one split to many: {IoU_values[IoU_values > 0.02]}")
                 filtered_frontiers.append(frontier)
                 kept_frontier_area = kept_frontier_area | frontier.region
                 frontier_appended = True
-            elif np.sum(IoU_values > 0.1) == 1:
+                # then remove those new frontiers
+                ft_ids = list(np.argwhere(IoU_values > 0.02).squeeze())
+                ft_ids.sort(reverse=True)
+                for ft_idx in ft_ids:
+                    valid_ft_angles.pop(ft_idx)
+            elif np.sum(IoU_values > 0.02) == 1:
                 # if some old frontiers are merged into one new frontier
                 ft_idx = np.argmax(IoU_values)
                 IoU_with_old_ft = np.asarray([IoU(valid_ft_angles[ft_idx]['region'], ft.region) for ft in self.frontiers])
                 print(f'IoU with old frontiers: {IoU_with_old_ft}')
-                if np.sum(IoU_with_old_ft > 0.1) >= 2 and cfg.region_equal_threshold < np.sum(IoU_with_old_ft[IoU_with_old_ft > 0.1]) <= 1:
+                if np.sum(IoU_with_old_ft > 0.02) >= 2 and cfg.region_equal_threshold < np.sum(IoU_with_old_ft[IoU_with_old_ft > 0.02]) <= 1:
                     # if the new frontier is merged from two or more old frontiers, and their sizes are equal
                     # then add all the old frontiers
-                    logging.debug(f"Frontier many merged to one: {IoU_with_old_ft[IoU_with_old_ft > 0.1]}")
-                    for i in list(np.argwhere(IoU_with_old_ft > 0.1)):
+                    logging.debug(f"Frontier many merged to one: {IoU_with_old_ft[IoU_with_old_ft > 0.02]}")
+                    for i in list(np.argwhere(IoU_with_old_ft > 0.02)):
                         if self.frontiers[i] not in filtered_frontiers:
                             filtered_frontiers.append(self.frontiers[i])
                             kept_frontier_area = kept_frontier_area | self.frontiers[i].region
@@ -1246,7 +1251,7 @@ class TSDFPlanner:
             np.argmin(np.linalg.norm(center_candidates - cur_point[:2], axis=1))
         ]
         center = adjust_navigation_point(
-            center, self.occupied, max_dist=0.3, max_adjust_distance=0.3, voxel_size=self._voxel_size
+            center, self.occupied, max_dist=0.5, max_adjust_distance=0.3, voxel_size=self._voxel_size
         )
 
         # center = frontier_edge_areas[

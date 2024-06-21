@@ -1,8 +1,5 @@
 import os
 import random
-
-import matplotlib.image
-
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HABITAT_SIM_LOG"] = (
@@ -20,6 +17,7 @@ import glob
 import math
 import quaternion
 import matplotlib.pyplot as plt
+import matplotlib.image
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
@@ -668,7 +666,7 @@ def main(cfg):
                         else:
                             plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
 
-                    if cfg.save_egocentric_view:
+                    if cfg.save_egocentric_view and view_idx == total_views - 1:
                         egocentric_save_dir = os.path.join(episode_data_dir, 'egocentric')
                         os.makedirs(egocentric_save_dir, exist_ok=True)
                         plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}.png"), rgb)
