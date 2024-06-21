@@ -36,6 +36,7 @@ import scipy.ndimage as ndimage
 from skimage import measure
 from sklearn.cluster import DBSCAN, KMeans
 from scipy.ndimage import gaussian_filter
+from scipy import stats
 from .geom import *
 from .habitat import pos_normal_to_habitat, pos_habitat_to_normal
 import habitat_sim
@@ -82,6 +83,8 @@ class TSDFPlanner:
         floor_height_offset=0,
         pts_init=None,
         init_clearance=0,
+        occupancy_height=0.4,
+        vision_height=1.2
     ):
         """Constructor.
         Args:
@@ -153,6 +156,9 @@ class TSDFPlanner:
             int(init_clearance / self._voxel_size),
             self._vol_dim[:2],
         )
+
+        self.occupancy_height = occupancy_height  # the occupied/navigable map is acquired at this height
+        self.vision_height =  vision_height # the visibility map is acquired at this height
 
         self.simple_scene_graph = {}
         self.frontiers: List[Frontier] = []
@@ -500,7 +506,7 @@ class TSDFPlanner:
         """Determine the next frontier to traverse to with semantic-value-weighted sampling."""
         cur_point = self.world2vox(pts)
 
-        island, unoccupied = self.get_island_around_pts(pts, height=0.4)
+        island, unoccupied = self.get_island_around_pts(pts, height=self.occupancy_height)
         occupied = np.logical_not(unoccupied).astype(int)
         unexplored = (np.sum(self._explore_vol_cpu, axis=-1) == 0).astype(int)
         for point in self.init_points:
@@ -534,7 +540,7 @@ class TSDFPlanner:
             return False
 
         occupied_map_camera = np.logical_not(
-            self.get_island_around_pts(pts, height=1.2)[0]
+            self.get_island_around_pts(pts, height=self.vision_height)[0]
         )
 
         # cluster frontier regions
@@ -930,7 +936,7 @@ class TSDFPlanner:
                 ax1.scatter(max_point.position[1], max_point.position[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
-            island_high, _ = self.get_island_around_pts(pts, height=1.2)
+            island_high, _ = self.get_island_around_pts(pts, height=self.vision_height)
             ax2.imshow(island_high)
             for frontier in self.frontiers:
                 if frontier.image is not None:
@@ -1034,6 +1040,16 @@ class TSDFPlanner:
             island_coords = np.unravel_index(np.argmin(dist_all), dist_all.shape)
             islands_ind = islands[island_coords[0], island_coords[1]]
         island = islands == islands_ind
+
+        # also we need to include the island of all existing frontiers when calculating island at the same height as frontier
+        if abs(height - self.occupancy_height) < 1e-3:
+            for frontier in self.frontiers:
+                frontier_inds = islands[frontier.region]
+                # get the most common index
+                mode_result = stats.mode(frontier_inds, axis=None)
+                frontier_ind = mode_result.mode
+                island = island | (islands == frontier_ind)
+
         return island, unoccupied
 
     def get_current_view_mask(

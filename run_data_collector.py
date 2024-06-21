@@ -64,9 +64,9 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        all_questions_in_scene = [q for q in all_questions_in_scene if '00009-vLpv2VX547B_68_printer' in q['question_id']]
-        if len(all_questions_in_scene) == 0:
-            continue
+        # all_questions_in_scene = [q for q in all_questions_in_scene if '00009-vLpv2VX547B_68_printer' in q['question_id']]
+        # if len(all_questions_in_scene) == 0:
+        #     continue
         # random.shuffle(all_questions_in_scene)
         # all_questions_in_scene = all_questions_in_scene[:2]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
@@ -208,6 +208,7 @@ def main(cfg):
 
                 # run steps
                 target_found = False
+                previous_choice_path = None
                 max_explore_dist = travel_dist * cfg.max_step_dist_ratio
                 explore_dist = 0.0
                 cnt_step = -1
@@ -447,6 +448,11 @@ def main(cfg):
                         break
                     assert sum(prediction) == 1.0, f"{sum(prediction)} != 1.0"
                     step_dict["prediction"] = prediction
+
+                    # record previous choice
+                    step_dict["previous_choice"] = previous_choice_path  # this could be None or an image path of the frontier in last step
+                    if type(max_point_choice) == Frontier:
+                        previous_choice_path = max_point_choice.image
 
                     # Save step data
                     with open(os.path.join(episode_data_dir, f"{cnt_step:04d}.json"), "w") as f:
