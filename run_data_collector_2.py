@@ -1,6 +1,8 @@
 import os
 import random
 
+import matplotlib.image
+
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # disable warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HABITAT_SIM_LOG"] = (
@@ -416,11 +418,39 @@ def main(cfg):
                     plt.savefig(os.path.join(visualization_path, "prev_{}_map.png".format(cnt_step)))
                     plt.close()
 
+                if cfg.save_frontier_video and len(tsdf_planner.frontiers) != 0:
+                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                    os.makedirs(frontier_video_path, exist_ok=True)
+                    num_images = len(tsdf_planner.frontiers)
+                    side_length = int(np.sqrt(num_images)) + 1
+                    fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                    for h_idx in range(side_length):
+                        for w_idx in range(side_length):
+                            axs[h_idx, w_idx].axis('off')
+                            i = h_idx * side_length + w_idx
+                            if i < num_images:
+                                img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                img = matplotlib.image.imread(img_path)
+                                axs[h_idx, w_idx].imshow(img)
+                                if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                    axs[h_idx, w_idx].set_title('Chosen')
+                    global_caption = f"{prev_question_data['question']}\n{prev_question_data['answer']}"
+                    if type(max_point_choice) == Object:
+                        global_caption += '\nToward target object'
+                    fig.suptitle(global_caption, fontsize=16)
+                    plt.tight_layout(rect=(0., 0., 1., 0.95))
+                    plt.savefig(os.path.join(frontier_video_path, f'prev_{cnt_step}.png'))
+                    plt.close()
+
                 # update position and rotation
                 pts_normal = np.append(pts_normal, floor_height)
                 pts = pos_normal_to_habitat(pts_normal)
                 rotation = get_quaternion(angle, camera_tilt)
                 explore_dist += np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) * tsdf_planner._voxel_size
+
+                if len(pts_pixs) >= 3 and np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) < 1e-3 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) < 1e-3:
+                    logging.info(f"Agent is stuck at step {cnt_step}")
+                    break
 
                 logging.info(f"Current position: {pts}, {explore_dist:.3f}/{max_explore_dist:.3f}")
 
@@ -482,6 +512,9 @@ def main(cfg):
                 int(cfg.init_clearance * 2 / tsdf_planner._voxel_size),
                 tsdf_planner._vol_dim[:2]
             )
+            # clear up the "stuck" mark in existing frontiers
+            for frontier in tsdf_planner.frontiers:
+                frontier.is_stuck = False
 
             # convert path points to normal and drop y-axis for tsdf planner
             path_points = [pos_habitat_to_normal(p) for p in path_points]
@@ -635,6 +668,11 @@ def main(cfg):
                         else:
                             plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
 
+                    if cfg.save_egocentric_view:
+                        egocentric_save_dir = os.path.join(episode_data_dir, 'egocentric')
+                        os.makedirs(egocentric_save_dir, exist_ok=True)
+                        plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}.png"), rgb)
+
                     observation_kept_count += 1
 
                     if target_found:
@@ -773,14 +811,48 @@ def main(cfg):
                 if cfg.save_frontier_video:
                     frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
                     os.makedirs(frontier_video_path, exist_ok=True)
-                    if type(max_point_choice) == Frontier:
-                        img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
-                        os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
-                    else:  # navigating to the objects
-                        if cfg.save_obs:
-                            img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
-                            if os.path.exists(img_path):
-                                os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
+                    # if type(max_point_choice) == Frontier:
+                    #     # img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
+                    #     # os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
+                    #     num_frontiers = len(tsdf_planner.frontiers)
+                    #     side_length = int(np.sqrt(num_frontiers)) + 1
+                    #     plt.figure()
+                    #     for i in range(1, num_frontiers + 1):
+                    #         plt.subplot(side_length, side_length, i)
+                    #         img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                    #         img = plt.imread(img_path)
+                    #         plt.imshow(img)
+                    #         plt.xticks([])
+                    #         plt.yticks([])
+                    #         if max_point_choice.image == tsdf_planner.frontiers[i].image:
+                    #             plt.title('chosen')
+                    #     plt.imsave(frontier_video_path, f'{cnt_step}.png')
+                    # else:  # navigating to the objects
+                    #     if cfg.save_obs:
+                    #         img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
+                    #         if os.path.exists(img_path):
+                    #             os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
+
+                    num_images = len(tsdf_planner.frontiers)
+                    side_length = int(np.sqrt(num_images)) + 1
+                    fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                    for h_idx in range(side_length):
+                        for w_idx in range(side_length):
+                            axs[h_idx, w_idx].axis('off')
+                            i = h_idx * side_length + w_idx
+                            if i < num_images:
+                                img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                img = matplotlib.image.imread(img_path)
+                                axs[h_idx, w_idx].imshow(img)
+                                if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                    axs[h_idx, w_idx].set_title('Chosen')
+                    global_caption = f"{question_data['question']}\n{question_data['answer']}"
+                    if type(max_point_choice) == Object:
+                        global_caption += '\nToward target object'
+                    fig.suptitle(global_caption, fontsize=16)
+                    plt.tight_layout(rect=(0., 0., 1., 0.95))
+                    plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
+                    plt.close()
 
                 # update position and rotation
                 pts_normal = np.append(pts_normal, floor_height)
