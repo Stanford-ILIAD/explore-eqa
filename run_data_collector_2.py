@@ -545,7 +545,7 @@ def main(cfg):
             zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             explore_dist = 0.0
             cnt_step = -1
-            while explore_dist < max_explore_dist and cnt_step < 30:
+            while explore_dist < max_explore_dist and cnt_step < 50:
                 cnt_step += 1
 
                 step_dict = {}
