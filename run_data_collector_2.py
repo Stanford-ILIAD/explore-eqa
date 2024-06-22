@@ -542,10 +542,11 @@ def main(cfg):
             target_found = False
             previous_choice_path = None
             max_explore_dist = travel_dist * cfg.max_step_dist_ratio
+            max_step = int(travel_dist * cfg.max_step_ratio)
             zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             explore_dist = 0.0
             cnt_step = -1
-            while explore_dist < max_explore_dist and cnt_step < 50:
+            while explore_dist < max_explore_dist and cnt_step < max_step:
                 cnt_step += 1
 
                 step_dict = {}
