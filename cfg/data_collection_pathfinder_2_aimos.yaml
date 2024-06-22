@@ -6,7 +6,7 @@ question_data_path: "generated_questions"
 scene_dataset_config_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_annotated_basis.scene_dataset_config.json'
 scene_data_path: "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d"
 semantic_bbox_data_path: '/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/hm3d_obj_bbox_merged'
-dataset_output_dir: "exploration_data_new"
+dataset_output_dir: "exploration_data_new_tempt"
 detection_model_name: "yolo_world/x"
 
 # Sample navigation point
@@ -22,14 +22,17 @@ hfov: 120
 tsdf_grid_size: 0.1
 margin_w_ratio: 0.25
 margin_h_ratio: 0.6
+occupancy_height: 0.4
+vision_height: 1.2
 
+save_obs_prev: true
 save_obs: true
+save_visualization_prev: true
 save_visualization: true
+save_frontier_prev: true
 save_frontier_video: true
 save_egocentric_view: true
 del_fail_case: false
-
-paths_per_question: 1
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -37,6 +40,7 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.3
+max_step_dist_ratio_prev: 1.3
 max_step_dist_ratio: 1.5
 min_random_init_steps: 2
 extra_view_phase_1: 4
