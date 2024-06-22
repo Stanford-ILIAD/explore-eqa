@@ -63,7 +63,7 @@ def main(cfg):
     # for each scene, answer each question
     question_ind = 0
     success_count = 0
-    total_questions = len(questions_data) * cfg.paths_per_question
+    total_questions = len(questions_data)
     for scene_id in all_scene_list:
         all_questions_in_scene = [q for q in questions_data if q["episode_history"] == scene_id]
 
