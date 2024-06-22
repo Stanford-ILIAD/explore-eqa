@@ -296,17 +296,89 @@ def get_navigable_point_from(pos_start, pathfinder, max_search=1000, min_dist=6,
             return pos_end, path_points, max_distance_history
 
 
+def get_navigable_point_from_new(pos_start, pathfinder, max_search=1000, min_dist=6, prev_start_positions=None, min_dist_from_prev=3, max_samples=100):
+    if min_dist < 0:
+        return None, None, None
+
+    pos_end_list = []
+
+    # if no previous start positions, just find a random navigable point that is the farthest among the searches
+    # otherwise, find the point that is the farthest from the previous start positions, and also satisfies the min_dist
+    try_count = 0
+    while True:
+        try_count += 1
+        if try_count > max_search:
+            break
+
+        pos_end_current = pathfinder.get_random_navigable_point()
+        if np.abs(pos_end_current[1] - pos_start[1]) > 0.4:  # make sure the end point is on the same level
+            continue
+
+        path = habitat_sim.ShortestPath()
+        path.requested_start = pos_start
+        path.requested_end = pos_end_current
+        found_path = pathfinder.find_path(path)
+        if found_path:
+            if path.geodesic_distance > min_dist:
+                if prev_start_positions is None:
+                    pos_end_list.append(pos_end_current)
+                else:
+                    if np.all(
+                        np.linalg.norm(
+                            prev_start_positions - pos_end_current, axis=1
+                        ) > min_dist_from_prev
+                    ):
+                        pos_end_list.append(pos_end_current)
+
+        if len(pos_end_list) >= max_samples:
+            break
+
+    if len(pos_end_list) == 0:
+        # if no point is found that satisfies the min_dist, then find again with shorter min_dist
+        return get_navigable_point_from_new(
+            pos_start,
+            pathfinder,
+            max_search,
+            min_dist - 2,
+            prev_start_positions,
+            min_dist_from_prev,
+            max_samples
+        )
+
+    # sample a ramdom point from the list
+    while True:
+        pos_end = pos_end_list[np.random.randint(len(pos_end_list))]
+        path = habitat_sim.ShortestPath()
+        path.requested_start = pos_start
+        path.requested_end = pos_end
+        found_path = pathfinder.find_path(path)
+        if found_path:
+            break
+    return pos_end, path.points, path.geodesic_distance
+
+
 def get_navigable_point_to(pos_end, pathfinder, max_search=1000, min_dist=6, prev_start_positions=None):
     pos_start, path_point, travel_dist = get_navigable_point_from(
         pos_end, pathfinder, max_search, min_dist, prev_start_positions
     )
     if pos_start is None or path_point is None:
-        return None, None
+        return None, None, None
 
     # reverse the path_point
     path_point = path_point[::-1]
     return pos_start, path_point, travel_dist
 
+
+def get_navigable_point_to_new(pos_end, pathfinder, max_search=1000, min_dist=6, prev_start_positions=None):
+    pos_start, path_point, travel_dist = get_navigable_point_from_new(
+        pos_end, pathfinder, max_search, min_dist, prev_start_positions
+    )
+    if pos_start is None or path_point is None:
+        return None, None, None
+
+    # reverse the path_point
+    path_point = path_point[::-1]
+    return pos_start, path_point, travel_dist
 
 
 

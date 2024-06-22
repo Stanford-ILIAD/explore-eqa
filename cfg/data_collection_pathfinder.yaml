@@ -11,6 +11,7 @@ detection_model_name: "yolo_world/s"
 
 # Sample navigation point
 min_travel_dist: 5.0
+min_travel_dist_ratio: 0.8
 
 # Camera, image
 camera_height: 1.5
@@ -28,7 +29,7 @@ save_frontier_video: true
 save_egocentric_view: true
 del_fail_case: false
 
-paths_per_question: 1
+paths_per_question: 6
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image

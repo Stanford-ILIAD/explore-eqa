@@ -29,7 +29,7 @@ from src.habitat import (
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
     get_quaternion,
-    get_navigable_point_to
+    get_navigable_point_to_new
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf import TSDFPlanner, Frontier, Object
@@ -154,9 +154,13 @@ def main(cfg):
                     prev_start_positions = np.asarray(prev_start_positions)
 
                 # get a navigation start point
+                floor_height = target_position[1]
+                tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
+                scene_length = (tsdf_bnds[:2, 1] - tsdf_bnds[:1, 0]).mean()
+                min_dist = max(cfg.min_travel_dist, scene_length * cfg.min_travel_dist_ratio)
                 pathfinder.seed(random.randint(0, 1000000))
-                start_position, path_points, travel_dist = get_navigable_point_to(
-                    target_position, pathfinder, max_search=1000, min_dist=cfg.min_travel_dist,
+                start_position, path_points, travel_dist = get_navigable_point_to_new(
+                    target_position, pathfinder, max_search=1000, min_dist=min_dist,
                     prev_start_positions=prev_start_positions
                 )
                 if start_position is None or path_points is None:
@@ -175,8 +179,6 @@ def main(cfg):
 
                 # initialize the TSDF
                 pts_normal = pos_habitat_to_normal(pts)
-                floor_height = target_position[1]
-                tsdf_bnds, scene_size = get_scene_bnds(pathfinder, floor_height)
                 try:
                     del tsdf_planner
                 except:

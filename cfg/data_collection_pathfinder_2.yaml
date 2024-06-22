@@ -11,6 +11,7 @@ detection_model_name: "yolo_world/s"
 
 # Sample navigation point
 min_travel_dist: 5.0
+min_travel_dist_ratio: 0.8
 
 # Camera, image
 camera_height: 1.5
