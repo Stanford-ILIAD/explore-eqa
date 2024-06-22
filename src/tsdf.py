@@ -795,6 +795,9 @@ class TSDFPlanner:
                 try_count = 0
                 while True:
                     try_count += 1
+                    if try_count > 100:
+                        logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point near object at {target_point}")
+                        return (None,)
                     try:
                         target_navigable_point_habitat = pathfinder.get_random_navigable_point_near(
                             circle_center=target_point_habitat,
@@ -808,9 +811,6 @@ class TSDFPlanner:
                         continue
                     if abs(target_navigable_point_habitat[1] - pts[-1]) < 0.1:
                         break
-                    if try_count > 100:
-                        logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point near object at {target_point}")
-                        return (None,)
                 target_navigable_point = self.habitat2voxel(target_navigable_point_habitat)[:2]
             next_point = target_navigable_point
         elif type(choice) == Frontier:
