@@ -847,6 +847,7 @@ def main(cfg):
 
                     num_images = len(tsdf_planner.frontiers)
                     side_length = int(np.sqrt(num_images)) + 1
+                    side_length = max(2, side_length)
                     fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
                     for h_idx in range(side_length):
                         for w_idx in range(side_length):
