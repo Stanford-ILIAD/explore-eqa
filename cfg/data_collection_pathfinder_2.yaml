@@ -33,8 +33,6 @@ save_frontier_video: true
 save_egocentric_view: true
 del_fail_case: false
 
-paths_per_question: 2
-
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
 stop_max_bias_from_center: 0.4  # the target object should be within 60% of the image center horizontally
@@ -44,10 +42,10 @@ init_clearance: 0.3
 max_step_dist_ratio_prev: 1.3
 max_step_dist_ratio: 1.5
 min_random_init_steps: 2
-extra_view_phase_1: 6
-extra_view_angle_deg_phase_1: 40
-extra_view_phase_2: 8  # in phase 2, have more observations
-extra_view_angle_deg_phase_2: 45
+extra_view_phase_1: 4
+extra_view_angle_deg_phase_1: 60
+extra_view_phase_2: 4  # in phase 2, have more observations
+extra_view_angle_deg_phase_2: 60
 
 # Observation filtering
 black_pixel_ratio: 0.2

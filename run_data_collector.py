@@ -123,6 +123,7 @@ def main(cfg):
                 target_rotation = question_data['rotation']
                 episode_data_dir = os.path.join(str(cfg.dataset_output_dir), f"{question_data['question_id']}_path_{path_idx}")
                 episode_frontier_dir = os.path.join(episode_data_dir, "frontier_rgb")
+                egocentric_save_dir = os.path.join(episode_data_dir, 'egocentric')
 
                 # if the data has already generated, skip
                 if os.path.exists(episode_data_dir) and os.path.exists(os.path.join(episode_data_dir, "metadata.json")):
@@ -135,6 +136,7 @@ def main(cfg):
 
                 os.makedirs(episode_data_dir, exist_ok=True)
                 os.makedirs(episode_frontier_dir, exist_ok=True)
+                os.makedirs(egocentric_save_dir, exist_ok=True)
 
                 # get the starting points of other generated paths for this object, if there exists any
                 # get all the folder in the form os.path.join(str(cfg.dataset_output_dir), f"{question_data['question_id']}_path_*")
@@ -210,6 +212,7 @@ def main(cfg):
                 target_found = False
                 previous_choice_path = None
                 max_explore_dist = travel_dist * cfg.max_step_dist_ratio
+                zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
                 explore_dist = 0.0
                 cnt_step = -1
                 while explore_dist < max_explore_dist and cnt_step < 30:
@@ -260,6 +263,8 @@ def main(cfg):
                         if collision_dist < cfg.collision_dist:
                             if not (view_idx == total_views - 1 and keep_forward_observation):
                                 # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                                if cfg.save_egocentric_view:
+                                    plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}_view_{view_idx}.png"), zero_image)
                                 continue
 
                         agent_state.position = pts
@@ -294,6 +299,8 @@ def main(cfg):
                         if not keep_observation:
                             if not (view_idx == total_views - 1 and keep_forward_observation):
                                 # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                                if cfg.save_egocentric_view:
+                                    plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}_view_{view_idx}.png"), zero_image)
                                 continue
 
                         # construct an frequency count map of each semantic id to a unique id
@@ -340,10 +347,8 @@ def main(cfg):
                             else:
                                 plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
 
-                        if cfg.save_egocentric_view and view_idx == total_views - 1:
-                            egocentric_save_dir = os.path.join(episode_data_dir, 'egocentric')
-                            os.makedirs(egocentric_save_dir, exist_ok=True)
-                            plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}.png"), rgb)
+                        if cfg.save_egocentric_view:
+                            plt.imsave(os.path.join(egocentric_save_dir, f"{cnt_step}_view_{view_idx}.png"), rgb)
 
                         observation_kept_count += 1
 
