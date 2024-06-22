@@ -9,4 +9,4 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 
-python run_data_collector_pathfinder.py -cf cfg/data_collection_pathfinder_aimos.yaml --path_id_offset 0 --seed 64
+python run_data_collector.py -cf cfg/data_collection_pathfinder_aimos.yaml --path_id_offset 0 --seed 64
