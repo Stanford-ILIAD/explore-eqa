@@ -622,7 +622,7 @@ class TSDFPlanner:
                     # if the new frontier is merged from two or more old frontiers, and their sizes are equal
                     # then add all the old frontiers
                     logging.debug(f"Frontier many merged to one: {IoU_with_old_ft[IoU_with_old_ft > 0.02]}")
-                    for i in list(np.argwhere(IoU_with_old_ft > 0.02)):
+                    for i in list(np.argwhere(IoU_with_old_ft > 0.02).squeeze()):
                         if self.frontiers[i] not in filtered_frontiers:
                             filtered_frontiers.append(self.frontiers[i])
                             kept_frontier_area = kept_frontier_area | self.frontiers[i].region
