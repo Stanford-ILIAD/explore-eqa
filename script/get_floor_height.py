@@ -59,7 +59,7 @@ seed = 42
 volume_sample_fac = 5.0
 significance_threshold = 0.2
 scene_floor_heights = {}
-for scene_ind in tqdm(range(len(scene_names))):
+for scene_ind in range(len(scene_names)):
     scene = scene_names[scene_ind]
     print(f"==== {scene} {scene_ind+1}/{len(scene_names)}====")
 
