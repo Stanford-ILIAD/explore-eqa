@@ -8,10 +8,19 @@ import json
 import numpy as np
 from sklearn.cluster import KMeans
 import habitat_sim  # takes time
+from tqdm.notebook import tqdm
+
+import sys
+from pathlib import Path
+# Get the directory of the current script
+current_dir = Path(__file__).parent
+# Get the parent directory
+parent_dir = current_dir.parent
+# Add the parent directory to sys.path
+sys.path.append(str(parent_dir))
 from src.habitat import (
     make_simple_cfg,
 )
-from tqdm.notebook import tqdm
 
 # Get scenes
 scene_dir_train = "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/train"
