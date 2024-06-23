@@ -192,12 +192,7 @@ def main(cfg):
         logging.info(f'Rare classes: {rare_class_list}')
 
         # load the floor data
-        scene_id = int(scene_path.split("/")[-1].split("-")[0])
-        if scene_id < 800:
-            floor_data_path = cfg.train_floor_data_path
-        else:
-            floor_data_path = cfg.val_floor_data_path
-        with open(floor_data_path, "rb") as f:
+        with open(cfg.floor_data_path, "rb") as f:
             scene_floor_data = pickle.load(f)
         # get floors from points data
         floor_data = scene_floor_data[scene_path.split("/")[-1]]
