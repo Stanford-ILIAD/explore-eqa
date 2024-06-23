@@ -8,16 +8,19 @@ import json
 import numpy as np
 from sklearn.cluster import KMeans
 import habitat_sim  # takes time
-from util.habitat import (
+from src.habitat import (
     make_simple_cfg,
 )
 from tqdm.notebook import tqdm
 
 # Get scenes
-scene_dir = "../hm3dsem/val"
-scene_names = os.listdir(scene_dir)
-topdown_dir = "../hm3dsem/topdown"
-
+scene_dir_train = "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/train"
+scene_dir_val = "/gpfs/u/home/LMCG/LMCGnngn/scratch/multisensory/MLLM/data/hm3d/val"
+scene_names_train = os.listdir(scene_dir_train)
+scene_names = [name for name in scene_names_train if os.path.isdir(os.path.join(scene_dir_train, name))]
+scene_names_val = os.listdir(scene_dir_val)
+scene_names += [name for name in scene_names_val if os.path.isdir(os.path.join(scene_dir_val, name))]
+print("Number of scenes:", len(scene_names))
 
 def sample_random_points(sim, volume_sample_fac=1.0, significance_threshold=0.2):
     scene_bb = sim.get_active_scene_graph().get_root_node().cumulative_bb
@@ -52,7 +55,8 @@ for scene_ind in tqdm(range(len(scene_names))):
     print(f"==== {scene} {scene_ind+1}/{len(scene_names)}====")
 
     # get number of floors based on topview
-    num_floor = len(glob.glob(os.path.join(topdown_dir, scene + "_floor_*.png")))
+    # num_floor = len(glob.glob(os.path.join(topdown_dir, scene + "_floor_*.png")))
+    num_floor = 1
     print("Number of floors from topview:", num_floor)
 
     # Load in habitat
@@ -60,8 +64,13 @@ for scene_ind in tqdm(range(len(scene_names))):
         simulator.close()
     except:
         pass
-    scene_mesh_dir = os.path.join(scene_dir, scene, scene[6:] + ".basis" + ".glb")
-    navmesh_file = os.path.join(scene_dir, scene, scene[6:] + ".basis" + ".navmesh")
+    split = "train" if scene in scene_names_train else "val"
+    if split == "train":
+        scene_mesh_dir = os.path.join(scene_dir_train, scene, scene[6:] + ".basis" + ".glb")
+        navmesh_file = os.path.join(scene_dir_train, scene, scene[6:] + ".basis" + ".navmesh")
+    else:
+        scene_mesh_dir = os.path.join(scene_dir_val, scene, scene[6:] + ".basis" + ".glb")
+        navmesh_file = os.path.join(scene_dir_val, scene, scene[6:] + ".basis" + ".navmesh")
     sim_settings = {
         "scene": scene_mesh_dir,
         "default_agent": 0,
@@ -70,13 +79,17 @@ for scene_ind in tqdm(range(len(scene_names))):
         "height": 480,
         "hfov": 100,
     }
-    cfg = make_simple_cfg(sim_settings)
-    simulator = habitat_sim.Simulator(cfg)
-    pathfinder = simulator.pathfinder
-    pathfinder.seed(seed)
-    pathfinder.load_nav_mesh(navmesh_file)
-    agent = simulator.initialize_agent(sim_settings["default_agent"])
-    agent_state = habitat_sim.AgentState()
+    try:
+        cfg = make_simple_cfg(sim_settings)
+        simulator = habitat_sim.Simulator(cfg)
+        pathfinder = simulator.pathfinder
+        pathfinder.seed(seed)
+        pathfinder.load_nav_mesh(navmesh_file)
+        agent = simulator.initialize_agent(sim_settings["default_agent"])
+        agent_state = habitat_sim.AgentState()
+    except Exception as e:
+        print("Error loading habitat:", e)
+        continue
 
     # sample a lot of points
     points = sample_random_points(
@@ -93,8 +106,12 @@ for scene_ind in tqdm(range(len(scene_names))):
         "num_point_cluster": num_point_cluster,
         "points": points,
     }
+    if scene_ind % 20 == 0:
+        # Save floor data
+        with open("scene_floor_heights.pkl", "wb") as f:
+            pickle.dump(scene_floor_heights, f)
 
 
 # Save floor data
-with open("../hm3dsem/scene_floor_heights_val.pkl", "wb") as f:
+with open("scene_floor_heights.pkl", "wb") as f:
     pickle.dump(scene_floor_heights, f)
