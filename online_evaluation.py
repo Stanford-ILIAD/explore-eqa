@@ -72,6 +72,9 @@ def main(cfg):
             [question_id.split('_')[0] for question_id in all_questions_list]
         ))
     )
+
+    random.shuffle(all_scene_list)
+
     logging.info(f"Loaded {len(all_questions_list)} questions in {len(all_scene_list)} scenes.")
 
     print("load model")
@@ -103,8 +106,8 @@ def main(cfg):
         # all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
         # if len(all_questions_in_scene) == 0:
         #     continue
-        # random.shuffle(all_questions_in_scene)
-        # all_questions_in_scene = all_questions_in_scene[:2]
+        random.shuffle(all_question_id_in_scene)
+        all_question_id_in_scene = all_question_id_in_scene[:2]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
@@ -485,31 +488,6 @@ def main(cfg):
                         logging.info(f"Question id {question_id} invalid: no valid choice!")
                         break
 
-                    if cfg.save_frontier_video:
-                        frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
-                        os.makedirs(frontier_video_path, exist_ok=True)
-                        num_images = len(tsdf_planner.frontiers)
-                        side_length = int(np.sqrt(num_images)) + 1
-                        side_length = max(2, side_length)
-                        fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
-                        for h_idx in range(side_length):
-                            for w_idx in range(side_length):
-                                axs[h_idx, w_idx].axis('off')
-                                i = h_idx * side_length + w_idx
-                                if i < num_images:
-                                    img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
-                                    img = matplotlib.image.imread(img_path)
-                                    axs[h_idx, w_idx].imshow(img)
-                                    if type(max_point_choice) == Frontier and max_point_choice.image ==  tsdf_planner.frontiers[i].image:
-                                        axs[h_idx, w_idx].set_title('Chosen')
-                        global_caption = f"{question}\n{answer}"
-                        if type(max_point_choice) == Object:
-                            global_caption += '\nToward target object'
-                        fig.suptitle(global_caption, fontsize=16)
-                        plt.tight_layout(rect=(0., 0., 1., 0.95))
-                        plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
-                        plt.close()
-
                     update_success = tsdf_planner.set_next_navigation_point(
                         choice=max_point_choice,
                         pts=pts_normal,
@@ -552,6 +530,31 @@ def main(cfg):
 
                     fig.tight_layout()
                     plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
+                    plt.close()
+
+                if cfg.save_frontier_video:
+                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                    os.makedirs(frontier_video_path, exist_ok=True)
+                    num_images = len(tsdf_planner.frontiers)
+                    side_length = int(np.sqrt(num_images)) + 1
+                    side_length = max(2, side_length)
+                    fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                    for h_idx in range(side_length):
+                        for w_idx in range(side_length):
+                            axs[h_idx, w_idx].axis('off')
+                            i = h_idx * side_length + w_idx
+                            if i < num_images:
+                                img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                img = matplotlib.image.imread(img_path)
+                                axs[h_idx, w_idx].imshow(img)
+                                if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                    axs[h_idx, w_idx].set_title('Chosen')
+                    global_caption = f"{question}\n{answer}"
+                    if type(max_point_choice) == Object:
+                        global_caption += '\nToward target object'
+                    fig.suptitle(global_caption, fontsize=16)
+                    plt.tight_layout(rect=(0., 0., 1., 0.95))
+                    plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
                     plt.close()
 
                 # update position and rotation
