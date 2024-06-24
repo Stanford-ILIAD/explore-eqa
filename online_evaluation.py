@@ -19,6 +19,7 @@ import math
 import torch
 import quaternion
 import matplotlib.pyplot as plt
+import matplotlib.image
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
@@ -30,7 +31,6 @@ from src.habitat import (
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
     get_quaternion,
-    get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf_rollout import TSDFPlanner, Frontier, Object
@@ -158,6 +158,7 @@ def main(cfg):
 
             # load question data
             question = metadata["question"]
+            answer = metadata["answer"]
             init_pts = metadata["init_pts"]
             init_angle = metadata["init_angle"]
             target_obj_id = metadata['target_obj_id']
@@ -232,8 +233,16 @@ def main(cfg):
                 occupied_map = np.logical_not(unoccupied_map)
 
                 # observe and update the TSDF
+                keep_forward_observation = False
+                observation_kept_count = 0
                 for view_idx, ang in enumerate(all_angles):
-                    # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+                    if cnt_step == 0:
+                        keep_forward_observation = True  # at the first exploration step, always keep the forward observation
+                    if view_idx == total_views - 1 and observation_kept_count == 0:
+                        keep_forward_observation = True  # if all previous observation is invalid, then we have to keep the forward one
+                    if pts_pixs.shape[0] >= 3:
+                        if np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) < 1e-3 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) < 1e-3:
+                            keep_forward_observation = True  # the agent is stuck somehow
 
                     # check whether current view is valid
                     collision_dist = tsdf_planner._voxel_size * get_collision_distance(
@@ -241,9 +250,10 @@ def main(cfg):
                         pos=tsdf_planner.habitat2voxel(pts),
                         direction=tsdf_planner.rad2vector(ang)
                     )
-                    if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
-                        # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
-                        continue
+                    if collision_dist < cfg.collision_dist:
+                        if not (view_idx == total_views - 1 and keep_forward_observation):
+                            # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                            continue
 
                     agent_state.position = pts
                     agent_state.rotation = get_quaternion(ang, camera_tilt)
@@ -274,9 +284,10 @@ def main(cfg):
                     positive_depth = depth[depth > 0]
                     if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
                         keep_observation = False
-                    if not keep_observation and view_idx != total_views - 1:
-                        # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
-                        continue
+                    if not keep_observation:
+                        if not (view_idx == total_views - 1 and keep_forward_observation):
+                            # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                            continue
 
                     # construct an frequency count map of each semantic id to a unique id
                     with torch.no_grad():
@@ -295,11 +306,9 @@ def main(cfg):
                     if target_in_view:
                         if target_obj_id in tsdf_planner.simple_scene_graph.keys():
                             target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
-                            logging.debug(f"Target object pix ratio: {target_obj_pix_ratio}")
                             if target_obj_pix_ratio > 0:
                                 obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
                                 bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
-                                logging.debug(f"Bias from center: {bias_from_center}")
                                 # currently just consider that the object should be in around the horizontal center, not the vertical center
                                 # due to the viewing angle difference
                                 if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
@@ -324,6 +333,8 @@ def main(cfg):
                             plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
                         else:
                             plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
+
+                    observation_kept_count += 1
 
                     if target_found:
                         break
@@ -474,10 +485,36 @@ def main(cfg):
                         logging.info(f"Question id {question_id} invalid: no valid choice!")
                         break
 
+                    if cfg.save_frontier_video:
+                        frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                        os.makedirs(frontier_video_path, exist_ok=True)
+                        num_images = len(tsdf_planner.frontiers)
+                        side_length = int(np.sqrt(num_images)) + 1
+                        side_length = max(2, side_length)
+                        fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                        for h_idx in range(side_length):
+                            for w_idx in range(side_length):
+                                axs[h_idx, w_idx].axis('off')
+                                i = h_idx * side_length + w_idx
+                                if i < num_images:
+                                    img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                    img = matplotlib.image.imread(img_path)
+                                    axs[h_idx, w_idx].imshow(img)
+                                    if type(max_point_choice) == Frontier and max_point_choice.image ==  tsdf_planner.frontiers[i].image:
+                                        axs[h_idx, w_idx].set_title('Chosen')
+                        global_caption = f"{question}\n{answer}"
+                        if type(max_point_choice) == Object:
+                            global_caption += '\nToward target object'
+                        fig.suptitle(global_caption, fontsize=16)
+                        plt.tight_layout(rect=(0., 0., 1., 0.95))
+                        plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
+                        plt.close()
+
                     update_success = tsdf_planner.set_next_navigation_point(
                         choice=max_point_choice,
                         pts=pts_normal,
                         cfg=cfg.planner,
+                        pathfinder=pathfinder
                     )
                     if not update_success:
                         logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
@@ -516,18 +553,6 @@ def main(cfg):
                     fig.tight_layout()
                     plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
                     plt.close()
-
-                if cfg.save_frontier_video:
-                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
-                    os.makedirs(frontier_video_path, exist_ok=True)
-                    if type(max_point_choice) == Frontier:
-                        img_path = os.path.join(episode_frontier_dir, max_point_choice.image)
-                        os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-frontier.png')}")
-                    else:  # navigating to the objects
-                        if cfg.save_obs:
-                            img_path = os.path.join(observation_save_dir, f"{cnt_step}-view_{total_views - 1}.png")
-                            if os.path.exists(img_path):
-                                os.system(f"cp {img_path} {os.path.join(frontier_video_path, f'{cnt_step:04d}-object.png')}")
 
                 # update position and rotation
                 pts_normal = np.append(pts_normal, floor_height)

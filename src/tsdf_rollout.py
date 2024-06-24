@@ -53,7 +53,7 @@ class Frontier:
     orientation: np.ndarray  # directional vector of the frontier in float
     region: np.ndarray  # boolean array of the same shape as the voxel grid, indicating the region of the frontier
     frontier_id: int  # unique id for the frontier to identify its region on the frontier map
-    visited: bool = False  # whether the frontier has been visited before
+    is_stuck: bool = False  # whether the frontier has been visited before
     image: str = None
     feature: torch.Tensor = None
 
@@ -156,7 +156,6 @@ class TSDFPlanner:
             self._vol_dim[:2],
         )
 
-        self.target_direction = None
         self.max_point = None
         self.target_point = None
         self.simple_scene_graph = {}
@@ -435,7 +434,7 @@ class TSDFPlanner:
                 255.0, np.round((w_old * old_r + obs_weight * new_r) / w_new)
             )
             self._color_vol_cpu[valid_vox_x, valid_vox_y, valid_vox_z] = (
-                    new_b * self._color_const + new_g * 256 + new_r
+                new_b * self._color_const + new_g * 256 + new_r
             )
 
         # Integrate semantics if specified
@@ -592,19 +591,53 @@ class TSDFPlanner:
 
         # remove frontiers that have been changed
         filtered_frontiers = []
+        kept_frontier_area = np.zeros_like(self.frontier_map, dtype=bool)
         for frontier in self.frontiers:
-            if any(region_equal(frontier.region, new_ft['region'], threshold=cfg.region_equal_threshold) for new_ft in valid_ft_angles):
-                # the frontier is not changed at all
+            if frontier in filtered_frontiers:
+                continue
+            IoU_values = np.asarray([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+            frontier_appended = False
+            if np.any(IoU_values > cfg.region_equal_threshold):
+                # the frontier is not changed (almost)
                 filtered_frontiers.append(frontier)
+                kept_frontier_area = kept_frontier_area | frontier.region
+                frontier_appended = True
                 # then remove that new frontier
-                ft_idx = np.argmax([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+                ft_idx = np.argmax(IoU_values)
                 valid_ft_angles.pop(ft_idx)
-            else:
+            elif np.sum(IoU_values > 0.02) >= 2 and cfg.region_equal_threshold < np.sum(IoU_values[IoU_values > 0.02]) <= 1:
+                # if one old frontier is split into two new frontiers, and their sizes are equal
+                # then keep the old frontier
+                logging.debug(f"Frontier one split to many: {IoU_values[IoU_values > 0.02]}")
+                filtered_frontiers.append(frontier)
+                kept_frontier_area = kept_frontier_area | frontier.region
+                frontier_appended = True
+                # then remove those new frontiers
+                ft_ids = list(np.argwhere(IoU_values > 0.02).squeeze())
+                ft_ids.sort(reverse=True)
+                for ft_idx in ft_ids:
+                    valid_ft_angles.pop(ft_idx)
+            elif np.sum(IoU_values > 0.02) == 1:
+                # if some old frontiers are merged into one new frontier
+                ft_idx = np.argmax(IoU_values)
+                IoU_with_old_ft = np.asarray([IoU(valid_ft_angles[ft_idx]['region'], ft.region) for ft in self.frontiers])
+                if np.sum(IoU_with_old_ft > 0.02) >= 2 and cfg.region_equal_threshold < np.sum(IoU_with_old_ft[IoU_with_old_ft > 0.02]) <= 1:
+                    # if the new frontier is merged from two or more old frontiers, and their sizes are equal
+                    # then add all the old frontiers
+                    logging.debug(f"Frontier many merged to one: {IoU_with_old_ft[IoU_with_old_ft > 0.02]}")
+                    for i in list(np.argwhere(IoU_with_old_ft > 0.02).squeeze()):
+                        if self.frontiers[i] not in filtered_frontiers:
+                            filtered_frontiers.append(self.frontiers[i])
+                            kept_frontier_area = kept_frontier_area | self.frontiers[i].region
+                    valid_ft_angles.pop(ft_idx)
+                    frontier_appended = True
+
+            if not frontier_appended:
                 self.free_frontier(frontier)
-                if any(0.8 < IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles):
+                if np.any(IoU_values > 0.8):
                     # the frontier is slightly updated
                     # choose the new frontier that updates the current frontier
-                    update_ft_idx = np.argmax([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+                    update_ft_idx = np.argmax(IoU_values)
                     ang = valid_ft_angles[update_ft_idx]['angle']
                     # if the new frontier has no valid observations
                     if 1 > self._voxel_size * get_collision_distance(
@@ -621,6 +654,7 @@ class TSDFPlanner:
                         filtered_frontiers[-1].image = old_img_path
                         filtered_frontiers[-1].feature = old_img_feature
                         valid_ft_angles.pop(update_ft_idx)
+                        kept_frontier_area = kept_frontier_area | filtered_frontiers[-1].region
         self.frontiers = filtered_frontiers
 
         # merge new frontiers if they are too close
@@ -643,7 +677,9 @@ class TSDFPlanner:
 
         # create new frontiers and add to frontier list
         for ft_data in valid_ft_angles:
-            if not any(region_equal(prev_ft.region, ft_data['region'], threshold=cfg.region_equal_threshold) for prev_ft in self.frontiers):
+            region_covered_ratio = np.sum(ft_data['region'] & kept_frontier_area) / np.sum(ft_data['region'])
+            if region_covered_ratio < 1 - cfg.region_equal_threshold:
+                # if this frontier is not covered by the existing frontiers, then add it
                 self.frontiers.append(
                     self.create_frontier(ft_data, frontier_edge_areas=frontier_edge_areas, cur_point=cur_point)
                 )
@@ -655,6 +691,7 @@ class TSDFPlanner:
             choice: Union[Object, Frontier],
             pts,
             cfg,
+            pathfinder
     ) -> bool:
         if self.max_point is not None or self.target_point is not None:
             # if the next point is already set
@@ -671,9 +708,31 @@ class TSDFPlanner:
             # target_navigable_point = get_proper_observe_point(target_point, self.unoccupied, cur_point=cur_point, dist=cfg.final_observe_distance / self._voxel_size)
             target_navigable_point = get_random_observe_point(target_point, self.unoccupied, min_dist=15, max_dist=30)
             if target_navigable_point is None:
-                # a wierd case that no unoccupied point is found in all the space
-                logging.error(f"Error in find_next_pose_with_path: get_proper_observe_point of target point {target_point} returned None")
-                return False
+                # this is usually because the target object is too far, so its surroundings are not detected as unoccupied
+                # so we just temporarily use pathfinder to find a navigable point around it
+                target_point_normal = target_point * self._voxel_size + self._vol_origin[:2]
+                target_point_normal = np.append(target_point_normal, pts[-1])
+                target_point_habitat = pos_normal_to_habitat(target_point_normal)
+                try_count = 0
+                while True:
+                    try_count += 1
+                    if try_count > 100:
+                        logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point near object at {target_point}")
+                        return False
+                    try:
+                        target_navigable_point_habitat = pathfinder.get_random_navigable_point_near(
+                            circle_center=target_point_habitat,
+                            radius=1.0,
+                        )
+                    except:
+                        logging.error(f"Error in find_next_pose_with_path: pathfinder.get_random_navigable_point_near failed")
+                        continue
+                    if np.isnan(target_navigable_point_habitat).any():
+                        logging.error(f"Error in find_next_pose_with_path: pathfinder.get_random_navigable_point_near returned nan")
+                        continue
+                    if abs(target_navigable_point_habitat[1] - pts[-1]) < 0.1:
+                        break
+                target_navigable_point = self.habitat2voxel(target_navigable_point_habitat)[:2]
             self.target_point = target_navigable_point
             return True
         elif type(choice) == Frontier:
@@ -748,12 +807,17 @@ class TSDFPlanner:
                 walk_dir = walk_dir / np.linalg.norm(walk_dir)
                 next_point = cur_point[:2] + walk_dir * max_dist_from_cur
                 # ensure next point is valid, otherwise go backward a bit
+                try_count = 0
                 while (
                     not self.check_within_bnds(next_point)
                     or not self.island[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                     or self.occupied[int(np.round(next_point[0])), int(np.round(next_point[1]))]
                 ):
                     next_point -= walk_dir
+                    try_count += 1
+                    if try_count > 1000:
+                        logging.error(f"Error in find_next_pose_with_path: cannot find a proper next point")
+                        return (None,)
                 next_point = np.round(next_point).astype(int)
         else:
             target_arrived = True
@@ -776,9 +840,10 @@ class TSDFPlanner:
             direction = self.rad2vector(angle)
         direction = direction / np.linalg.norm(direction)
 
-        # mark the max point as visited if it is a frontier
-        if type(self.max_point) == Frontier:
-            self.max_point.visited = True
+        # if the next point is the same as the current point, and the target is a frontier
+        # then the frontier is stuck and cannot be reached
+        if np.linalg.norm(next_point - cur_point[:2]) < 1e-6 and type(self.max_point) == Frontier:
+            self.max_point.is_stuck = True
 
         # Plot
         fig = None
@@ -795,7 +860,7 @@ class TSDFPlanner:
             for obj_center in self.simple_scene_graph.values():
                 obj_vox = self.habitat2voxel(obj_center)
                 ax1.scatter(obj_vox[1], obj_vox[0], c="w", s=30)
-            # plot the position of the target navigation point
+            # plot the target point if found
             # if type(self.max_point) == Object:
             #     ax1.scatter(self.max_point.position[1], self.max_point.position[0], c="r", s=80, label="target")
             ax1.scatter(self.target_point[1], self.target_point[0], c="r", s=80, label="target")
@@ -904,14 +969,14 @@ class TSDFPlanner:
         return island, unoccupied
 
     def get_current_view_mask(
-            self,
-            cam_intr,
-            cam_pose,
-            im_w,
-            im_h,
-            slack=0,
-            margin_h=0,
-            margin_w=0,
+        self,
+        cam_intr,
+        cam_pose,
+        im_w,
+        im_h,
+        slack=0,
+        margin_h=0,
+        margin_w=0,
     ):
         cam_pts = rigid_transform(self.cam_pts_pre, np.linalg.inv(cam_pose))
         pix_z = cam_pts[:, 2]
@@ -937,17 +1002,17 @@ class TSDFPlanner:
         num_points = int(np.linalg.norm(direction))
         dir_norm = direction / np.linalg.norm(direction)
         points_between = (
-                p1[:2] + dir_norm * np.arange(num_points + 1)[:, np.newaxis]
+            p1[:2] + dir_norm * np.arange(num_points + 1)[:, np.newaxis]
         ).astype(int)
         points_occupied = np.sum(occupied[points_between[:, 0], points_between[:, 1]])
         return points_occupied > threshold
 
     def check_within_bnds(self, pts, slack=0):
         return not (
-                pts[0] <= slack
-                or pts[0] >= self._vol_dim[0] - slack
-                or pts[1] <= slack
-                or pts[1] >= self._vol_dim[1] - slack
+            pts[0] <= slack
+            or pts[0] >= self._vol_dim[0] - slack
+            or pts[1] <= slack
+            or pts[1] >= self._vol_dim[1] - slack
         )
 
     def clip_2d_array(self, array):
@@ -956,7 +1021,7 @@ class TSDFPlanner:
             & (array[:, 0] < self._vol_dim[0])
             & (array[:, 1] >= 0)
             & (array[:, 1] < self._vol_dim[1])
-            ]
+        ]
 
     def find_normal_into_space(self, point, island, space, num_check=10):
         """Find the normal direction into the space"""
@@ -977,8 +1042,7 @@ class TSDFPlanner:
                 direction *= -1
         return direction
 
-    def get_closest_distance(self, path_points: List[np.ndarray], point: np.ndarray, normal: np.ndarray, pathfinder,
-                             height):
+    def get_closest_distance(self, path_points: List[np.ndarray], point: np.ndarray, normal: np.ndarray, pathfinder, height):
         # get the closest distance for each segment in the path curve
         # use pathfinder's distance instead of the euclidean distance
         dist = np.inf
@@ -1112,9 +1176,23 @@ class TSDFPlanner:
         all_direction_norm = np.linalg.norm(all_directions, axis=1, keepdims=True)
         all_direction_norm = np.where(all_direction_norm == 0, np.inf, all_direction_norm)
         all_directions = all_directions / all_direction_norm
-        center = frontier_edge_areas[
-            np.argmax(np.dot(all_directions, ft_direction))
+
+        # the center is the closest point in the edge areas from current point that have close cosine angles
+        cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
+        center_candidates = np.asarray(
+            [frontier_edge_areas[idx] for idx in cos_sim_rank[:5]]
+        )
+        center = center_candidates[
+            np.argmin(np.linalg.norm(center_candidates - cur_point[:2], axis=1))
         ]
+        center = adjust_navigation_point(
+            center, self.occupied, max_dist=0.5, max_adjust_distance=0.3, voxel_size=self._voxel_size
+        )
+
+        # center = frontier_edge_areas[
+        #     np.argmax(np.dot(all_directions, ft_direction))
+        # ]
+
         # cos_sim_rank = np.argsort(-np.dot(all_directions, ft_direction))
         # # the center is the farthest point in the closest three points
         # center_candidates = np.asarray(

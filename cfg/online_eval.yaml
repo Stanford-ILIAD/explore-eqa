@@ -34,10 +34,10 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 init_clearance: 0.3
 max_step_room_size_ratio: 7
 min_random_init_steps: 2
-extra_view_phase_1: 6
-extra_view_angle_deg_phase_1: 40
-extra_view_phase_2: 8  # in phase 2, have more observations
-extra_view_angle_deg_phase_2: 45
+extra_view_phase_1: 4
+extra_view_angle_deg_phase_1: 60
+extra_view_phase_2: 4  # in phase 2, have more observations
+extra_view_angle_deg_phase_2: 60
 
 # Observation filtering
 black_pixel_ratio: 0.2
@@ -61,10 +61,9 @@ planner:
   eps: 1
   min_dist_from_cur: 0.5
   max_dist_from_cur_phase_1: 1  # when the target object is not found, explore the frontiers with this step length
-  max_dist_from_cur_phase_2: 0.4  # when the target object is found, go to the target object with this step length
+  max_dist_from_cur_phase_2: 0.5  # when the target object is found, go to the target object with this step length
   max_unexplored_check_frontier: 3
   max_unoccupied_check_frontier: 1
-  final_observe_distance: 1.0  # in phase 2, find a place that is this far from the target object to observe it
 
   # about frontier selection
   frontier_spacing: 0.5
@@ -72,9 +71,9 @@ planner:
   frontier_edge_area_max: 6
   frontier_area_min: 8
   frontier_area_max: 9
-  min_frontier_area: 12  # the frontier should have at least this many pixels
-  max_frontier_angle_range_deg: 90  # the angle spanned by the pixels in a frontier should not be larger than this
-  min_frontier_angle_diff_deg: 30  # the angle between two frontiers should be larger than this. otherwise, merge them
+  min_frontier_area: 20  # the frontier should have at least this many pixels
+  max_frontier_angle_range_deg: 150  # the angle spanned by the pixels in a frontier should not be larger than this
+  min_frontier_angle_diff_deg: 45  # the angle between two frontiers should be larger than this. otherwise, merge them
   region_equal_threshold: 0.95
 
 visual_prompt:
