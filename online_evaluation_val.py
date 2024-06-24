@@ -376,7 +376,7 @@ def main(cfg):
                     frontier.feature = img_feature
 
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
-                if first_object_choice is not None:
+                if first_object_choice is None:
                     # choose a frontier, and set it as the explore target
                     step_dict["frontiers"] = []
                     # Seems buggy here
