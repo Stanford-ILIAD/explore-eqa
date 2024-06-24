@@ -364,6 +364,45 @@ def main(cfg):
                     logging.info(f"Question id {scene_id} invalid: update frontier map failed!")
                     break
 
+                # Turn to face each frontier point and get rgb image
+                for i, frontier in enumerate(tsdf_planner.frontiers):
+                    pos_voxel = frontier.position
+                    pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                    pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                    assert (frontier.image is None and frontier.feature is None) or (frontier.image is not None and frontier.feature is not None), f"{frontier.image}, {frontier.feature is None}"
+                    # Turn to face the frontier point
+                    if frontier.image is None:
+                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                        default_view_direction = np.asarray([0., 0., -1.])
+                        if np.linalg.norm(view_frontier_direction) < 1e-3:
+                            view_frontier_direction = default_view_direction
+                        if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                            # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                            # we need to specify rotating along y-axis
+                            agent_state.rotation = quat_to_coeffs(
+                                quaternion.quaternion(0, 0, 1, 0)
+                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                            ).tolist()
+                        else:
+                            agent_state.rotation = quat_to_coeffs(
+                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                            ).tolist()
+                        agent.set_state(agent_state)
+                        # Get observation at current pose - skip black image, meaning robot is outside the floor
+                        obs = simulator.get_sensor_observations()
+                        rgb = obs["color_sensor"]
+                        plt.imsave(
+                            os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
+                            rgb,
+                        )
+                        processed_rgb = rgba2rgb(rgb)
+                        with torch.no_grad():
+                            img_feature = encode(model, image_processor, processed_rgb).mean(1)
+                        assert img_feature is not None
+                        frontier.image = f"{cnt_step}_{i}.png"
+                        frontier.feature = img_feature
+
                 if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                     # choose a frontier, and set it as the explore target
                     step_dict["frontiers"] = []
@@ -374,45 +413,11 @@ def main(cfg):
                         pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
                         pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
                         frontier_dict["coordinate"] = pos_world.tolist()
-                        # Turn to face the frontier point
-                        if frontier.image is not None:
-                            frontier_dict["rgb_feature"] = frontier.feature
-                            frontier_dict["rgb_id"] = frontier.image
-                        else:
-                            view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                            default_view_direction = np.asarray([0., 0., -1.])
-                            if np.linalg.norm(view_frontier_direction) < 1e-3:
-                                view_frontier_direction = default_view_direction
-                            if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
-                                # if the rotation is to rotate 180 degree, then the quaternion is not unique
-                                # we need to specify rotating along y-axis
-                                agent_state.rotation = quat_to_coeffs(
-                                    quaternion.quaternion(0, 0, 1, 0)
-                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                                ).tolist()
-                            else:
-                                agent_state.rotation = quat_to_coeffs(
-                                    quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                                ).tolist()
-                            agent.set_state(agent_state)
-                            # Get observation at current pose - skip black image, meaning robot is outside the floor
-                            obs = simulator.get_sensor_observations()
-                            rgb = obs["color_sensor"]
-                            plt.imsave(
-                                os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                                rgb,
-                            )
-                            processed_rgb = rgba2rgb(rgb)
-                            with torch.no_grad():
-                                img_feature = encode(model, image_processor, processed_rgb).mean(1)
-                            assert img_feature is not None
-                            frontier.image = f"{cnt_step}_{i}.png"
-                            frontier.feature = img_feature
-                            frontier_dict["rgb_feature"] = img_feature
-                            frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"
+                        assert frontier.image is not None and frontier.feature is not None
+                        frontier_dict["rgb_feature"] = frontier.feature
+                        frontier_dict["rgb_id"] = frontier.image
+
                         step_dict["frontiers"].append(frontier_dict)
-                        assert frontier_dict["rgb_feature"] is not None
 
                     # add model prediction here
                     if len(step_dict["frontiers"]) > 0:
@@ -498,6 +503,31 @@ def main(cfg):
                         logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
                         break
 
+                if cfg.save_frontier_video:
+                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                    os.makedirs(frontier_video_path, exist_ok=True)
+                    num_images = len(tsdf_planner.frontiers)
+                    side_length = int(np.sqrt(num_images)) + 1
+                    side_length = max(2, side_length)
+                    fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                    for h_idx in range(side_length):
+                        for w_idx in range(side_length):
+                            axs[h_idx, w_idx].axis('off')
+                            i = h_idx * side_length + w_idx
+                            if i < num_images:
+                                img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                                img = matplotlib.image.imread(img_path)
+                                axs[h_idx, w_idx].imshow(img)
+                                if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                    axs[h_idx, w_idx].set_title('Chosen')
+                    global_caption = f"{question}\n{answer}"
+                    if type(max_point_choice) == Object:
+                        global_caption += '\nToward target object'
+                    fig.suptitle(global_caption, fontsize=16)
+                    plt.tight_layout(rect=(0., 0., 1., 0.95))
+                    plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
+                    plt.close()
+
                 return_values = tsdf_planner.agent_step(
                     pts=pts_normal,
                     angle=angle,
@@ -530,31 +560,6 @@ def main(cfg):
 
                     fig.tight_layout()
                     plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
-                    plt.close()
-
-                if cfg.save_frontier_video:
-                    frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
-                    os.makedirs(frontier_video_path, exist_ok=True)
-                    num_images = len(tsdf_planner.frontiers)
-                    side_length = int(np.sqrt(num_images)) + 1
-                    side_length = max(2, side_length)
-                    fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
-                    for h_idx in range(side_length):
-                        for w_idx in range(side_length):
-                            axs[h_idx, w_idx].axis('off')
-                            i = h_idx * side_length + w_idx
-                            if i < num_images:
-                                img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
-                                img = matplotlib.image.imread(img_path)
-                                axs[h_idx, w_idx].imshow(img)
-                                if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
-                                    axs[h_idx, w_idx].set_title('Chosen')
-                    global_caption = f"{question}\n{answer}"
-                    if type(max_point_choice) == Object:
-                        global_caption += '\nToward target object'
-                    fig.suptitle(global_caption, fontsize=16)
-                    plt.tight_layout(rect=(0., 0., 1., 0.95))
-                    plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
                     plt.close()
 
                 # update position and rotation
