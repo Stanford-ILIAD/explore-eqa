@@ -19,19 +19,18 @@ import math
 import torch
 import quaternion
 import matplotlib.pyplot as plt
+import matplotlib.image
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
 import habitat_sim
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 from src.habitat import (
-    make_simple_cfg,
     make_semantic_cfg,
     pos_normal_to_habitat,
     pos_habitat_to_normal,
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
     get_quaternion,
-    get_navigable_point_to
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf_rollout import TSDFPlanner, Frontier, Object
@@ -94,6 +93,7 @@ def main(cfg):
     for question_idx, question_data in enumerate(questions_list):
         question_id = question_data['question_id']
         question = question_data['question']
+        answer = question_data['answer']
 
         # Extract question
         scene_id = question_data["episode_history"]
@@ -225,8 +225,16 @@ def main(cfg):
             occupied_map = np.logical_not(unoccupied_map)
 
             # observe and update the TSDF
+            keep_forward_observation = False
+            observation_kept_count = 0
             for view_idx, ang in enumerate(all_angles):
-                # logging.info(f"Step {cnt_step}, view {view_idx + 1}/{total_views}")
+                if cnt_step == 0:
+                    keep_forward_observation = True  # at the first exploration step, always keep the forward observation
+                if view_idx == total_views - 1 and observation_kept_count == 0:
+                    keep_forward_observation = True  # if all previous observation is invalid, then we have to keep the forward one
+                if pts_pixs.shape[0] >= 3:
+                    if np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) < 1e-3 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) < 1e-3:
+                        keep_forward_observation = True  # the agent is stuck somehow
 
                 # check whether current view is valid
                 collision_dist = tsdf_planner._voxel_size * get_collision_distance(
@@ -234,9 +242,10 @@ def main(cfg):
                     pos=tsdf_planner.habitat2voxel(pts),
                     direction=tsdf_planner.rad2vector(ang)
                 )
-                if collision_dist < cfg.collision_dist and view_idx != total_views - 1:  # the last view is the main view, and is not dropped
-                    # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
-                    continue
+                if collision_dist < cfg.collision_dist:
+                    if not (view_idx == total_views - 1 and keep_forward_observation):
+                        # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
+                        continue
 
                 agent_state.position = pts
                 agent_state.rotation = get_quaternion(ang, camera_tilt)
@@ -271,9 +280,10 @@ def main(cfg):
                 positive_depth = depth[depth > 0]
                 if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
                     keep_observation = False
-                if not keep_observation and view_idx != total_views - 1:
-                    # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
-                    continue
+                if not keep_observation:
+                    if not (view_idx == total_views - 1 and keep_forward_observation):
+                        # logging.info(f"Invalid observation: black pixel ratio {black_pix_ratio}, 30 percentile depth {np.percentile(depth[depth > 0], 30)}")
+                        continue
 
                 # construct an frequency count map of each semantic id to a unique id
                 with torch.no_grad():
@@ -325,6 +335,45 @@ def main(cfg):
             if not update_success:
                 logging.info("Warning! Update frontier map failed!")
 
+            # Turn to face each frontier point and get rgb image
+            for i, frontier in enumerate(tsdf_planner.frontiers):
+                pos_voxel = frontier.position
+                pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                assert (frontier.image is None and frontier.feature is None) or (frontier.image is not None and frontier.feature is not None), f"{frontier.image}, {frontier.feature is None}"
+                # Turn to face the frontier point
+                if frontier.image is None:
+                    view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
+                    default_view_direction = np.asarray([0., 0., -1.])
+                    if np.linalg.norm(view_frontier_direction) < 1e-3:
+                        view_frontier_direction = default_view_direction
+                    if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+                        # if the rotation is to rotate 180 degree, then the quaternion is not unique
+                        # we need to specify rotating along y-axis
+                        agent_state.rotation = quat_to_coeffs(
+                            quaternion.quaternion(0, 0, 1, 0)
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                    else:
+                        agent_state.rotation = quat_to_coeffs(
+                            quat_from_two_vectors(default_view_direction, view_frontier_direction)
+                            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+                        ).tolist()
+                    agent.set_state(agent_state)
+                    # Get observation at current pose - skip black image, meaning robot is outside the floor
+                    obs = simulator.get_sensor_observations()
+                    rgb = obs["color_sensor"]
+                    plt.imsave(
+                        os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
+                        rgb,
+                    )
+                    processed_rgb = rgba2rgb(rgb)
+                    with torch.no_grad():
+                        img_feature = encode(model, image_processor, processed_rgb).mean(1)
+                    assert img_feature is not None
+                    frontier.image = f"{cnt_step}_{i}.png"
+                    frontier.feature = img_feature
+
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 # choose a frontier, and set it as the explore target
                 step_dict["frontiers"] = []
@@ -335,45 +384,11 @@ def main(cfg):
                     pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
                     pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
                     frontier_dict["coordinate"] = pos_world.tolist()
-                    # Turn to face the frontier point
-                    if frontier.image is not None:
-                        frontier_dict["rgb_feature"] = frontier.feature
-                        frontier_dict["rgb_id"] = frontier.image
-                    else:
-                        view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                        default_view_direction = np.asarray([0., 0., -1.])
-                        if np.linalg.norm(view_frontier_direction) < 1e-3:
-                            view_frontier_direction = default_view_direction
-                        if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
-                            # if the rotation is to rotate 180 degree, then the quaternion is not unique
-                            # we need to specify rotating along y-axis
-                            agent_state.rotation = quat_to_coeffs(
-                                quaternion.quaternion(0, 0, 1, 0)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
-                        else:
-                            agent_state.rotation = quat_to_coeffs(
-                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
-                        agent.set_state(agent_state)
-                        # Get observation at current pose - skip black image, meaning robot is outside the floor
-                        obs = simulator.get_sensor_observations()
-                        rgb = obs["color_sensor"]
-                        plt.imsave(
-                            os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                            rgb,
-                        )
-                        processed_rgb = rgba2rgb(rgb)
-                        with torch.no_grad():
-                            img_feature = encode(model, image_processor, processed_rgb).mean(1)
-                        assert img_feature is not None
-                        frontier.image = f"{cnt_step}_{i}.png"
-                        frontier.feature = img_feature
-                        frontier_dict["rgb_feature"] = img_feature
-                        frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"
+                    assert frontier.image is not None and frontier.feature is not None
+                    frontier_dict["rgb_feature"] = frontier.feature
+                    frontier_dict["rgb_id"] = frontier.image
+
                     step_dict["frontiers"].append(frontier_dict)
-                    assert frontier_dict["rgb_feature"] is not None
 
                 # add model prediction here
                 if len(step_dict["frontiers"]) > 0:
@@ -453,10 +468,36 @@ def main(cfg):
                     choice=max_point_choice,
                     pts=pts_normal,
                     cfg=cfg.planner,
+                    pathfinder=pathfinder
                 )
                 if not update_success:
                     logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
                     break
+
+            if cfg.save_frontier_video:
+                frontier_video_path = os.path.join(episode_data_dir, "frontier_video")
+                os.makedirs(frontier_video_path, exist_ok=True)
+                num_images = len(tsdf_planner.frontiers)
+                side_length = int(np.sqrt(num_images)) + 1
+                side_length = max(2, side_length)
+                fig, axs = plt.subplots(side_length, side_length, figsize=(20, 20))
+                for h_idx in range(side_length):
+                    for w_idx in range(side_length):
+                        axs[h_idx, w_idx].axis('off')
+                        i = h_idx * side_length + w_idx
+                        if i < num_images:
+                            img_path = os.path.join(episode_frontier_dir, tsdf_planner.frontiers[i].image)
+                            img = matplotlib.image.imread(img_path)
+                            axs[h_idx, w_idx].imshow(img)
+                            if type(max_point_choice) == Frontier and max_point_choice.image == tsdf_planner.frontiers[i].image:
+                                axs[h_idx, w_idx].set_title('Chosen')
+                global_caption = f"{question}\n{answer}"
+                if type(max_point_choice) == Object:
+                    global_caption += '\nToward target object'
+                fig.suptitle(global_caption, fontsize=16)
+                plt.tight_layout(rect=(0., 0., 1., 0.95))
+                plt.savefig(os.path.join(frontier_video_path, f'{cnt_step}.png'))
+                plt.close()
 
             return_values = tsdf_planner.agent_step(
                 pts=pts_normal,

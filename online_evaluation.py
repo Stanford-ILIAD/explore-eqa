@@ -106,8 +106,8 @@ def main(cfg):
         # all_questions_in_scene = [q for q in all_questions_in_scene if '00324' in q['question_id']]
         # if len(all_questions_in_scene) == 0:
         #     continue
-        random.shuffle(all_question_id_in_scene)
-        all_question_id_in_scene = all_question_id_in_scene[:2]
+        # random.shuffle(all_question_id_in_scene)
+        # all_question_id_in_scene = all_question_id_in_scene[:2]
         # all_questions_in_scene = [q for q in all_questions_in_scene if "00109" in q['question_id']]
         ##########################################################
 
