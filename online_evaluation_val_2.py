@@ -33,7 +33,7 @@ from src.habitat import (
     get_quaternion,
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
-from src.tsdf import TSDFPlanner, Frontier, Object
+from src.tsdf_rollout import TSDFPlanner, Frontier, Object
 from src.eval_utils import prepare_step_dict, get_item, encode, load_scene_features, rgba2rgb, load_checkpoint
 from inference.models import YOLOWorld
 
@@ -380,6 +380,15 @@ def main(cfg):
                     assert img_feature is not None
                     frontier.image = f"{cnt_step}_{i}.png"
                     frontier.feature = img_feature
+
+
+            # here clear out the target point in tsdf_planner
+            # so that we can choose a new target point on each step
+            if first_object_choice is None:
+                # if we are not in the stage of viewing an object in different angles
+                # then we choose a new target point each step
+                tsdf_planner.max_point = None
+                tsdf_planner.target_point = None
 
             if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
                 if first_object_choice is None:
