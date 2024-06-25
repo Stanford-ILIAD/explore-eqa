@@ -45,7 +45,6 @@ from easydict import EasyDict
 
 '''
 This code choose one frontier/object on each step, rather than walk to the frontier and then choose the next option
-Therefore, it uses scr.tsdf directly
 '''
 
 
@@ -530,7 +529,7 @@ def main(cfg):
                 save_visualization=cfg.save_visualization,
             )
             if return_values[0] is None:
-                logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
+                logging.info(f"Question id {question_id} invalid: agent_step failed!")
                 break
             pts_normal, angle, pts_pix, fig, target_arrived = return_values
 
@@ -577,7 +576,6 @@ def main(cfg):
                 if target_observation_count >= max_target_observation:
                     target_found = True
                     break
-
 
         if target_found:
             success_count += 1
