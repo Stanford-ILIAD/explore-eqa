@@ -104,8 +104,25 @@ def get_item(tokenizer, step_dict):
     scene = step['scene']
     scene_feature_map = step['scene_feature_map']
     obj_map = step['obj_map']
-    text =  f"Question: {step['question']}\n" +\
-            f"Select the frontier/object that would help finding the answer of the question.\n"
+    text =  f"Question: {step['question']}\n" 
+
+    if step.get("use_egocentric_views") is True:
+        text += "Followings are the egocentric views:\n "
+        for i in range(len(step["egocentric_view_features"])):
+            text += f"<scene> "
+        egocentric_features = step["egocentric_view_features"]
+        text += "/\n"
+    
+    text += f"Select the frontier/object that would help finding the answer of the question.\n"
+
+    if step.get("use_action_memory") is True:
+        text += f"Here is your selection in the previous step:\n "
+        if step["memory_feature"] is None:
+            text += f"No selection in the previous step. "
+        else:
+            text += f"<scene> "
+        memory_feature = step["memory_feature"]
+        text += "/\n"
     
     # replace scene graph in each steps with scene feature
     object_features = []
@@ -115,13 +132,7 @@ def get_item(tokenizer, step_dict):
         if str(sid) not in scene_feature_map.keys() or sid not in obj_map.keys():
             remove_indices.append(i)
         else:
-            # try:
-            # print(scene_feature_map[str(sid)])
-            # print(scene[str(sid)])
             object_feature = scene_feature_map[str(sid)]
-            # except:
-            #     remove_indices.append(i)
-            #     continue
             object_features.append(object_feature)
             class_name = obj_map[sid]
             text += f"object {object_index} {class_name} <scene> "
@@ -154,9 +165,16 @@ def get_item(tokenizer, step_dict):
         scene_feature = object_features
     else:
         scene_feature = frontier_features
+
+    if step.get("use_egocentric_views") is not None:
+        scene_feature = torch.cat([egocentric_features, scene_feature], dim=0)
+
+    if step.get("memory_feature") is not None:
+        scene_feature = torch.cat([memory_feature, scene_feature], dim=0)
    
     step["scene_feature"] = scene_feature
     # remove scene graph id --- remove this if we need to keep id
+    print(text)
     
     text = tokenizer(text, return_tensors = "pt",
                         max_length = 1024,

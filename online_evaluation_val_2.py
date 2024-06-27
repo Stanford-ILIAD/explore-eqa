@@ -214,6 +214,7 @@ def main(cfg):
         cnt_step = -1
         target_observation_count = 0
         first_object_choice = None
+        memory_feature = None
         while cnt_step < num_step - 1:
             cnt_step += 1
             logging.info(f"\n== step: {cnt_step}")
@@ -233,6 +234,8 @@ def main(cfg):
             # observe and update the TSDF
             keep_forward_observation = False
             observation_kept_count = 0
+            rgb_egocentric_views = []
+            zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             for view_idx, ang in enumerate(all_angles):
                 if cnt_step == 0:
                     keep_forward_observation = True  # at the first exploration step, always keep the forward observation
@@ -250,6 +253,7 @@ def main(cfg):
                 )
                 if collision_dist < cfg.collision_dist:
                     if not (view_idx == total_views - 1 and keep_forward_observation):
+                        rgb_egocentric_views.append(zero_image)
                         # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
                         continue
 
@@ -277,6 +281,8 @@ def main(cfg):
                     plt.imsave(
                         os.path.join(episode_observations_dir, "{}.png".format(cnt_step)), rgb
                     )
+                rgb = rgba2rgb(rgb)
+                rgb_egocentric_views.append(rgb)
 
                 # check whether the observation is valid
                 keep_observation = True
@@ -317,8 +323,8 @@ def main(cfg):
                     margin_w=int(cfg.margin_w_ratio * img_width),
                 )
 
-                if target_found:
-                    break
+                # if target_found:
+                #     break
 
             if target_found:
                 break
@@ -406,6 +412,22 @@ def main(cfg):
 
                         step_dict["frontiers"].append(frontier_dict)
 
+                    if cfg.egocentric_views:
+                        assert len(rgb_egocentric_views) == total_views
+                        egocentric_views_features = []
+                        for rgb_view in rgb_egocentric_views:
+                            processed_rgb = rgba2rgb(rgb_view)
+                            with torch.no_grad():
+                                img_feature = encode(model, image_processor, processed_rgb).mean(1)
+                            egocentric_views_features.append(img_feature)
+                        egocentric_views_features = torch.cat(egocentric_views_features, dim=0)
+                        step_dict["egocentric_view_features"] = egocentric_views_features.to("cpu")
+                        step_dict["use_egocentric_views"] = True
+                    
+                    if cfg.action_memory:
+                        step_dict["memory_feature"] = memory_feature
+                        step_dict["use_action_memory"] = True
+
                     # add model prediction here
                     if len(step_dict["frontiers"]) > 0:
                         step_dict["frontier_features"] = torch.cat(
@@ -420,13 +442,13 @@ def main(cfg):
                     step_dict["scene"] = scene_id
                     step_dict["scene_feature_map"] = scene_feature_map
 
-                    try:
-                        sample = get_item(
-                            tokenizer, step_dict
-                        )
-                    except:
-                        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
-                        break
+                    # try:
+                    sample = get_item(
+                        tokenizer, step_dict
+                    )
+                    # except:
+                    #     logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+                    #     break
                     feature_dict = EasyDict(
                         scene_feature = sample.scene_feature.to("cuda"),
                         scene_insert_loc = sample.scene_insert_loc,
@@ -475,6 +497,9 @@ def main(cfg):
                         logging.info(f"Next choice: Frontier at {target_point}")
                         tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
                         max_point_choice = tsdf_planner.frontiers[int(target_index)]
+
+                        # TODO: modify this: update memory feature only in frontiers (for now)
+                        memory_feature = tsdf_planner.frontiers[int(target_index)].feature.to("cpu")
 
                     if max_point_choice is None:
                         logging.info(f"Question id {question_id} invalid: no valid choice!")

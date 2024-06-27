@@ -1,6 +1,6 @@
 # General
 seed: 66
-exp_name: exp_online_eval_val
+exp_name: exp_online_eval_val_ego_1
 output_parent_dir: /work/pi_chuangg_umass_edu/yuncong/results
 question_data_path: "generated_questions"
 scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
@@ -9,9 +9,12 @@ semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_o
 # dataset_output_dir: /work/pi_chuangg_umass_edu/yuncong/results/exploration_data
 detection_model_name: "yolo_world/x"
 questions_list_path: 'data/openeqa_filtered_data_subset.json'
-scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict
-model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_new.pt
+scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val/
+model_path: /work/pi_chuangg_umass_edu/yuncong/data/checkpoint_mem_0.pt
 path_data_dir: exploration_data
+
+egocentric_views: false
+action_memory: false
 
 # Camera, image
 camera_height: 1.5
