@@ -323,6 +323,8 @@ def main(cfg):
                     margin_w=int(cfg.margin_w_ratio * img_width),
                 )
 
+                observation_kept_count += 1
+
                 # if target_found:
                 #     break
 
@@ -386,7 +388,6 @@ def main(cfg):
                     frontier.image = f"{cnt_step}_{i}.png"
                     frontier.feature = img_feature
 
-
             # here clear out the target point in tsdf_planner
             # so that we can choose a new target point on each step
             if first_object_choice is None:
@@ -423,7 +424,7 @@ def main(cfg):
                         egocentric_views_features = torch.cat(egocentric_views_features, dim=0)
                         step_dict["egocentric_view_features"] = egocentric_views_features.to("cpu")
                         step_dict["use_egocentric_views"] = True
-                    
+
                     if cfg.action_memory:
                         step_dict["memory_feature"] = memory_feature
                         step_dict["use_action_memory"] = True

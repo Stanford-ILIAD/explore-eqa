@@ -44,10 +44,8 @@ from easydict import EasyDict
 
 
 '''
-This code run rollouts on our synthesized evaluation dataset.
-It adopts the stop criteria similar to the one in data collector: the target object is detected in the view and occupies certain pixels.
-This code only tests the model's ability to navigate to the target object, not the ability to answer questions,
-and the results should be compared with baseline 1, 2 and 3.
+This code evaluate the newest model (with memory and egocentric view) on our synthesized dataset,
+with better metrics
 '''
 
 
@@ -96,6 +94,7 @@ def main(cfg):
 
     success_list = []
     path_length_list = []
+    dist_from_chosen_to_target_list = []
 
     for scene_id in all_scene_list:
         all_question_id_in_scene = [q for q in all_questions_list if scene_id in q]
@@ -173,8 +172,12 @@ def main(cfg):
             obj_bbox_center = obj_bbox_center[[0, 2, 1]]
 
             episode_data_dir = os.path.join(str(cfg.output_dir), question_id)
+            episode_observations_dir = os.path.join(episode_data_dir, 'observations')
+            episode_object_observe_dir = os.path.join(episode_data_dir, 'object_observations')
             episode_frontier_dir = os.path.join(episode_data_dir, "frontier_rgb")
             os.makedirs(episode_data_dir, exist_ok=True)
+            os.makedirs(episode_observations_dir, exist_ok=True)
+            os.makedirs(episode_object_observe_dir, exist_ok=True)
             os.makedirs(episode_frontier_dir, exist_ok=True)
 
             pts = init_pts
@@ -213,18 +216,15 @@ def main(cfg):
             prev_pts = pts.copy()
             target_found = False
             cnt_step = -1
+            first_object_choice = None
+            memory_feature = None
+            dist_from_chosen_to_target = None
             while cnt_step < num_step - 1:
                 cnt_step += 1
                 logging.info(f"\n== step: {cnt_step}")
                 step_dict = {}
-
-                # for each position, get the views from different angles
-                if target_obj_id in tsdf_planner.simple_scene_graph.keys():
-                    angle_increment = cfg.extra_view_angle_deg_phase_2 * np.pi / 180
-                    total_views = 1 + cfg.extra_view_phase_2
-                else:
-                    angle_increment = cfg.extra_view_angle_deg_phase_1 * np.pi / 180
-                    total_views = 1 + cfg.extra_view_phase_1
+                angle_increment = cfg.extra_view_angle_deg_phase_1 * np.pi / 180
+                total_views = 1 + cfg.extra_view_phase_1
                 all_angles = [angle + angle_increment * (i - total_views // 2) for i in range(total_views)]
                 # let the main viewing angle be the last one to avoid potential overwriting problems
                 main_angle = all_angles.pop(total_views // 2)
@@ -238,6 +238,8 @@ def main(cfg):
                 # observe and update the TSDF
                 keep_forward_observation = False
                 observation_kept_count = 0
+                rgb_egocentric_views = []
+                zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
                 for view_idx, ang in enumerate(all_angles):
                     if cnt_step == 0:
                         keep_forward_observation = True  # at the first exploration step, always keep the forward observation
@@ -255,6 +257,7 @@ def main(cfg):
                     )
                     if collision_dist < cfg.collision_dist:
                         if not (view_idx == total_views - 1 and keep_forward_observation):
+                            rgb_egocentric_views.append(zero_image)
                             # logging.info(f"Collision detected at step {cnt_step} view {view_idx}")
                             continue
 
@@ -278,6 +281,12 @@ def main(cfg):
                     rgb = obs["color_sensor"]
                     depth = obs["depth_sensor"]
                     semantic_obs = obs["semantic_sensor"]
+                    if cfg.save_obs:
+                        plt.imsave(
+                            os.path.join(episode_observations_dir, "{}.png".format(cnt_step)), rgb
+                        )
+                    rgb = rgba2rgb(rgb)
+                    rgb_egocentric_views.append(rgb)
 
                     # check whether the observation is valid
                     keep_observation = True
@@ -305,19 +314,6 @@ def main(cfg):
                             return_annotated=True
                         )
 
-                    # check stop condition
-                    if target_in_view:
-                        if target_obj_id in tsdf_planner.simple_scene_graph.keys():
-                            target_obj_pix_ratio = np.sum(semantic_obs == target_obj_id) / (img_height * img_width)
-                            if target_obj_pix_ratio > 0:
-                                obj_pix_center = np.mean(np.argwhere(semantic_obs == target_obj_id), axis=0)
-                                bias_from_center = (obj_pix_center - np.asarray([img_height // 2, img_width // 2])) / np.asarray([img_height, img_width])
-                                # currently just consider that the object should be in around the horizontal center, not the vertical center
-                                # due to the viewing angle difference
-                                if target_obj_pix_ratio > cfg.stop_min_pix_ratio and np.abs(bias_from_center)[1] < cfg.stop_max_bias_from_center:
-                                    logging.info(f"Stop condition met at step {cnt_step} view {view_idx}")
-                                    target_found = True
-
                     # TSDF fusion
                     tsdf_planner.integrate(
                         color_im=rgb,
@@ -329,18 +325,10 @@ def main(cfg):
                         margin_w=int(cfg.margin_w_ratio * img_width),
                     )
 
-                    if cfg.save_obs:
-                        observation_save_dir = os.path.join(episode_data_dir, 'observations')
-                        os.makedirs(observation_save_dir, exist_ok=True)
-                        if target_found:
-                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}-target.png"), annotated_rgb)
-                        else:
-                            plt.imsave(os.path.join(observation_save_dir, f"{cnt_step}-view_{view_idx}.png"), annotated_rgb)
-
                     observation_kept_count += 1
 
-                    if target_found:
-                        break
+                    # if target_found:
+                    #     break
 
                 if target_found:
                     break
@@ -361,8 +349,7 @@ def main(cfg):
 
                 update_success = tsdf_planner.update_frontier_map(pts=pts_normal, cfg=cfg.planner)
                 if not update_success:
-                    logging.info(f"Question id {scene_id} invalid: update frontier map failed!")
-                    break
+                    logging.info("Warning! Update frontier map failed!")
 
                 # Turn to face each frontier point and get rgb image
                 for i, frontier in enumerate(tsdf_planner.frontiers):
@@ -403,95 +390,129 @@ def main(cfg):
                         frontier.image = f"{cnt_step}_{i}.png"
                         frontier.feature = img_feature
 
+                # here clear out the target point in tsdf_planner
+                # so that we can choose a new target point on each step
+                if first_object_choice is None:
+                    # if we are not in the stage of viewing an object in different angles
+                    # then we choose a new target point each step
+                    tsdf_planner.max_point = None
+                    tsdf_planner.target_point = None
+
                 if tsdf_planner.max_point is None and tsdf_planner.target_point is None:
-                    # choose a frontier, and set it as the explore target
-                    step_dict["frontiers"] = []
-                    # Seems buggy here
-                    for i, frontier in enumerate(tsdf_planner.frontiers):
-                        frontier_dict = {}
-                        pos_voxel = frontier.position
-                        pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
-                        pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
-                        frontier_dict["coordinate"] = pos_world.tolist()
-                        assert frontier.image is not None and frontier.feature is not None
-                        frontier_dict["rgb_feature"] = frontier.feature
-                        frontier_dict["rgb_id"] = frontier.image
+                    if first_object_choice is None:
+                        # choose a frontier, and set it as the explore target
+                        step_dict["frontiers"] = []
+                        # Seems buggy here
+                        for i, frontier in enumerate(tsdf_planner.frontiers):
+                            frontier_dict = {}
+                            pos_voxel = frontier.position
+                            pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
+                            pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
+                            frontier_dict["coordinate"] = pos_world.tolist()
+                            assert frontier.image is not None and frontier.feature is not None
+                            frontier_dict["rgb_feature"] = frontier.feature
+                            frontier_dict["rgb_id"] = frontier.image
 
-                        step_dict["frontiers"].append(frontier_dict)
+                            step_dict["frontiers"].append(frontier_dict)
 
-                    # add model prediction here
-                    if len(step_dict["frontiers"]) > 0:
-                        step_dict["frontier_features"] = torch.cat(
-                            [
-                                frontier["rgb_feature"] for frontier in step_dict["frontiers"]
-                            ],
-                            dim=0
-                        ).to("cpu")
-                    else:
-                        step_dict["frontier_features"] = None
-                    step_dict["question"] = question
-                    step_dict["scene"] = scene_id
-                    step_dict["scene_feature_map"] = scene_feature_map
+                        if cfg.egocentric_views:
+                            assert len(rgb_egocentric_views) == total_views
+                            egocentric_views_features = []
+                            for rgb_view in rgb_egocentric_views:
+                                processed_rgb = rgba2rgb(rgb_view)
+                                with torch.no_grad():
+                                    img_feature = encode(model, image_processor, processed_rgb).mean(1)
+                                egocentric_views_features.append(img_feature)
+                            egocentric_views_features = torch.cat(egocentric_views_features, dim=0)
+                            step_dict["egocentric_view_features"] = egocentric_views_features.to("cpu")
+                            step_dict["use_egocentric_views"] = True
 
-                    try:
+                        if cfg.action_memory:
+                            step_dict["memory_feature"] = memory_feature
+                            step_dict["use_action_memory"] = True
+
+                        # add model prediction here
+                        if len(step_dict["frontiers"]) > 0:
+                            step_dict["frontier_features"] = torch.cat(
+                                [
+                                    frontier["rgb_feature"] for frontier in step_dict["frontiers"]
+                                ],
+                                dim=0
+                            ).to("cpu")
+                        else:
+                            step_dict["frontier_features"] = None
+                        step_dict["question"] = question
+                        step_dict["scene"] = scene_id
+                        step_dict["scene_feature_map"] = scene_feature_map
+
+                        # try:
                         sample = get_item(
                             tokenizer, step_dict
                         )
-                    except:
-                        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
-                        break
-                    feature_dict = EasyDict(
-                        scene_feature = sample.scene_feature.to("cuda"),
-                        scene_insert_loc = sample.scene_insert_loc,
-                        scene_length = sample.scene_length,
-                    )
-                    input_ids = sample.input_ids.to("cuda")
-                    if len(torch.where(sample.input_ids==22550)[1]) == 0:
-                        logging.info(f"Question id {question_id} invalid: no token 22550!")
-                        break
-                    answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
-                    input_ids = input_ids[:, :answer_ind+2]
-                    with torch.no_grad():
-                        with torch.inference_mode() and torch.autocast(device_type="cuda"):
-                            output_ids = model.generate(
-                                input_ids,
-                                feature_dict=feature_dict,
-                                do_sample=False,
-                                max_new_tokens=10,
-                            )
-                        outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
-                    try:
-                        target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
-                        print(f"Prediction: {target_type}, {target_index}")
-                    except:
-                        logging.info(f"Wrong output format, failed!")
-                        break
-
-                    if target_type not in ["object", "frontier"]:
-                        logging.info(f"Invalid prediction type: {target_type}, failed!")
-                        break
-
-                    if target_type == "object":
-                        if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.simple_scene_graph):
-                            logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.simple_scene_graph)}, failed!")
+                        # except:
+                        #     logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+                        #     break
+                        feature_dict = EasyDict(
+                            scene_feature = sample.scene_feature.to("cuda"),
+                            scene_insert_loc = sample.scene_insert_loc,
+                            scene_length = sample.scene_length,
+                        )
+                        input_ids = sample.input_ids.to("cuda")
+                        if len(torch.where(sample.input_ids==22550)[1]) == 0:
+                            logging.info(f"Question id {question_id} invalid: no token 22550!")
                             break
-                        pred_target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
-                        target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[pred_target_obj_id])[:2]
-                        logging.info(f"Next choice: Object at {target_point}")
-                        tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                        max_point_choice = Object(target_point.astype(int), pred_target_obj_id)
+                        answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
+                        input_ids = input_ids[:, :answer_ind+2]
+                        with torch.no_grad():
+                            with torch.inference_mode() and torch.autocast(device_type="cuda"):
+                                output_ids = model.generate(
+                                    input_ids,
+                                    feature_dict=feature_dict,
+                                    do_sample=False,
+                                    max_new_tokens=10,
+                                )
+                            outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+                        try:
+                            target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
+                            print(f"Prediction: {target_type}, {target_index}")
+                        except:
+                            logging.info(f"Wrong output format, failed!")
+                            break
+
+                        if target_type not in ["object", "frontier"]:
+                            logging.info(f"Invalid prediction type: {target_type}, failed!")
+                            break
+
+                        if target_type == "object":
+                            if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.simple_scene_graph):
+                                logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.simple_scene_graph)}, failed!")
+                                break
+                            pred_target_obj_id = list(tsdf_planner.simple_scene_graph.keys())[int(target_index)]
+                            target_point = tsdf_planner.habitat2voxel(tsdf_planner.simple_scene_graph[pred_target_obj_id])[:2]
+                            logging.info(f"Next choice: Object at {target_point}")
+                            tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
+                            max_point_choice = Object(target_point.astype(int), pred_target_obj_id)
+                        else:
+                            if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
+                                logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
+                                break
+                            target_point = tsdf_planner.frontiers[int(target_index)].position
+                            logging.info(f"Next choice: Frontier at {target_point}")
+                            tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
+                            max_point_choice = tsdf_planner.frontiers[int(target_index)]
+
+                            # TODO: modify this: update memory feature only in frontiers (for now)
+                            memory_feature = tsdf_planner.frontiers[int(target_index)].feature.to("cpu")
+
+                        if max_point_choice is None:
+                            logging.info(f"Question id {question_id} invalid: no valid choice!")
+                            break
+
+                        if type(max_point_choice) == Object:
+                            first_object_choice = max_point_choice
                     else:
-                        if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
-                            logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
-                            break
-                        target_point = tsdf_planner.frontiers[int(target_index)].position
-                        logging.info(f"Next choice: Frontier at {target_point}")
-                        tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                        max_point_choice = tsdf_planner.frontiers[int(target_index)]
-
-                    if max_point_choice is None:
-                        logging.info(f"Question id {question_id} invalid: no valid choice!")
-                        break
+                        logging.info(f"Keep choosing object {first_object_choice}")
+                        max_point_choice = first_object_choice
 
                     update_success = tsdf_planner.set_next_navigation_point(
                         choice=max_point_choice,
@@ -536,9 +557,9 @@ def main(cfg):
                     save_visualization=cfg.save_visualization,
                 )
                 if return_values[0] is None:
-                    logging.info(f"Question id {question_id} invalid: find next navigation point failed!")
+                    logging.info(f"Question id {question_id} invalid: agent_step failed!")
                     break
-                pts_normal, angle, pts_pix, fig, _ = return_values
+                pts_normal, angle, pts_pix, fig, target_arrived = return_values
 
                 # update the agent's position record
                 pts_pixs = np.vstack((pts_pixs, pts_pix))
@@ -571,6 +592,32 @@ def main(cfg):
                 path_length += float(np.linalg.norm(pts - prev_pts))
                 prev_pts = pts.copy()
 
+                if target_type == "object" and target_arrived:
+                    # the model found the target object and arrived at a proper observation point
+                    # get an observation and save it
+                    # the returned position and orientation should directly point to the target object
+                    agent_state_obs = habitat_sim.AgentState()
+                    agent_state_obs.position = pts
+                    agent_state_obs.rotation = rotation
+                    agent.set_state(agent_state_obs)
+                    obs = simulator.get_sensor_observations()
+                    rgb = obs["color_sensor"]
+                    plt.imsave(
+                        os.path.join(episode_object_observe_dir, f"target.png"), rgb
+                    )
+
+                    if max_point_choice.object_id == target_obj_id:
+                        logging.info(f"Question id {question_id} choose the correct object!")
+                        target_found = True
+                    else:
+                        logging.info(f"Question id {question_id} choose the wrong object!")
+
+                    # then, get the distance between target object and the chosen object
+                    chosen_obj_bbox_center = tsdf_planner.simple_scene_graph[max_point_choice.object_id]
+                    dist_from_chosen_to_target = np.linalg.norm(chosen_obj_bbox_center - obj_bbox_center)
+
+                    break
+
             if target_found:
                 success_count += 1
                 success_list.append(1)
@@ -579,16 +626,27 @@ def main(cfg):
                 success_list.append(0)
                 logging.info(f"Question id {question_id} failed, {path_length} length")
             path_length_list.append(path_length)
+            if dist_from_chosen_to_target is not None:
+                dist_from_chosen_to_target_list.append(dist_from_chosen_to_target)
 
             logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
             logging.info(f"Mean path length for success exploration: {np.mean([x for i, x in enumerate(path_length_list) if success_list[i] == 1])}")
+            logging.info(f"Mean path length for all exploration: {np.mean(path_length_list)}")
+            logging.info(f"Mean distance from chosen object to target object: {np.mean(dist_from_chosen_to_target_list)}")
 
         logging.info(f'Scene {scene_id} finish')
 
-    with open(os.path.join(cfg.output_dir, "success_list.pkl"), "wb") as f:
-        pickle.dump(success_list, f)
-    with open(os.path.join(cfg.output_dir, "path_length_list.pkl"), "wb") as f:
-        pickle.dump(path_length_list, f)
+    # with open(os.path.join(cfg.output_dir, "success_list.pkl"), "wb") as f:
+    #     pickle.dump(success_list, f)
+    # with open(os.path.join(cfg.output_dir, "path_length_list.pkl"), "wb") as f:
+    #     pickle.dump(path_length_list, f)
+    result_dict = {}
+    result_dict["success_rate"] = success_count / question_ind
+    result_dict["mean_path_length"] = np.mean(path_length_list)
+    result_dict["mean_success_path_length"] = np.mean([x for i, x in enumerate(path_length_list) if success_list[i] == 1])
+    result_dict["mean_distance_from_chosen_to_target"] = np.mean(dist_from_chosen_to_target_list)
+    with open(os.path.join(cfg.output_dir, "result.json"), "w") as f:
+        json.dump(result_dict, f, indent=4)
 
     logging.info(f'All scenes finish')
     try:
