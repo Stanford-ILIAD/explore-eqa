@@ -411,8 +411,6 @@ def main(cfg):
                         step_dict["frontiers"] = []
                         # Seems buggy here
                         for i, frontier in enumerate(tsdf_planner.frontiers):
-                            if frontier.is_stuck:
-                                continue
                             frontier_dict = {}
                             pos_voxel = frontier.position
                             pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
@@ -600,6 +598,11 @@ def main(cfg):
                 logging.info(f"Current position: {pts}")
                 path_length += float(np.linalg.norm(pts - prev_pts))
                 prev_pts = pts.copy()
+
+                if len(pts_pixs) >= 3 and np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) <= 1 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) <= 1:
+                    if type(max_point_choice) == Frontier:
+                        logging.info(f"Question id {question_id} stuck at frontier {max_point_choice.position}!!!")
+                        max_point_choice.is_stuck = True
 
                 if target_type == "object" and target_arrived:
                     # the model found the target object and arrived at a proper observation point
