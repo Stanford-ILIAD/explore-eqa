@@ -35,7 +35,7 @@ stop_max_bias_from_center: 0.4  # the target object should be within 60% of the 
 
 # Navigation
 init_clearance: 0.5
-max_step_room_size_ratio: 11
+max_step_room_size_ratio: 9
 min_random_init_steps: 2
 extra_view_phase_1: 4
 extra_view_angle_deg_phase_1: 60
