@@ -411,6 +411,8 @@ def main(cfg):
                         step_dict["frontiers"] = []
                         # Seems buggy here
                         for i, frontier in enumerate(tsdf_planner.frontiers):
+                            if frontier.is_stuck:
+                                continue
                             frontier_dict = {}
                             pos_voxel = frontier.position
                             pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
