@@ -63,7 +63,7 @@ def main(cfg):
 
     # Load dataset
     all_questions_list = os.listdir(cfg.path_data_dir)
-    all_questions_list = [question_id for question_id in all_questions_list if 650 < int(question_id.split('-')[0]) < 750]
+    all_questions_list = [question_id for question_id in all_questions_list if 700 < int(question_id.split('-')[0]) <= 800]
     total_questions = len(all_questions_list)
     all_scene_list = sorted(
         list(set(

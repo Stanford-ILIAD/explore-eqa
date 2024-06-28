@@ -4,11 +4,11 @@ exp_name: exp_online_eval_ours
 output_parent_dir: /work/pi_chuangg_umass_edu/yuncong/results
 question_data_path: "generated_questions"
 scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
-scene_data_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_datasets/hm3d/
+scene_data_path: /project/pi_chuangg_umass_edu/yuncong/data_v2/scene_datasets/hm3d/
 semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_obj_bbox_merged'
 # dataset_output_dir: /work/pi_chuangg_umass_edu/yuncong/results/exploration_data
 detection_model_name: "yolo_world/x"
-scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val/
+scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_merged/
 model_path: /work/pi_chuangg_umass_edu/yuncong/data/checkpoint_mem_0.pt
 path_data_dir: exploration_data
 
