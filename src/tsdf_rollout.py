@@ -806,7 +806,7 @@ class TSDFPlanner:
                 logging.info(f"pathfinder cannot find a path from {cur_point[:2]} to {self.target_point}, just go to a point between them")
                 walk_dir = self.target_point - cur_point[:2]
                 walk_dir = walk_dir / np.linalg.norm(walk_dir)
-                next_point = cur_point[:2] + walk_dir * max_dist_from_cur
+                next_point = cur_point[:2] + walk_dir * max_dist_from_cur / self._voxel_size
                 # ensure next point is valid, otherwise go backward a bit
                 try_count = 0
                 while (
