@@ -207,6 +207,11 @@ def main(cfg):
 
         logging.info(f'\n\nQuestion id {question_id} initialization successful!')
 
+        # get an empty observation for future use
+        zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+        with torch.no_grad():
+            zero_image_feature = encode(model, image_processor, zero_image).mean(1)
+
         # run steps
         path_length = 0
         prev_pts = pts.copy()
@@ -235,7 +240,6 @@ def main(cfg):
             keep_forward_observation = False
             observation_kept_count = 0
             rgb_egocentric_views = []
-            zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             for view_idx, ang in enumerate(all_angles):
                 if cnt_step == 0:
                     keep_forward_observation = True  # at the first exploration step, always keep the forward observation
@@ -351,6 +355,11 @@ def main(cfg):
 
             # Turn to face each frontier point and get rgb image
             for i, frontier in enumerate(tsdf_planner.frontiers):
+                if frontier.is_stuck:
+                    # if the frontier is stuck, replace it with empty image to avoid repeated choosing
+                    frontier.image = zero_image
+                    frontier.feature = zero_image_feature
+                    continue
                 pos_voxel = frontier.position
                 pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
                 pos_world = pos_normal_to_habitat(np.append(pos_world, floor_height))
