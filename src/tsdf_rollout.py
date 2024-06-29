@@ -596,8 +596,9 @@ class TSDFPlanner:
             if frontier in filtered_frontiers:
                 continue
             IoU_values = np.asarray([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+            pix_diff_values = np.asarray([pix_diff(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
             frontier_appended = False
-            if np.any(IoU_values > cfg.region_equal_threshold):
+            if np.any((IoU_values > cfg.region_equal_threshold) | (pix_diff_values <= 3)):
                 # the frontier is not changed (almost)
                 filtered_frontiers.append(frontier)
                 kept_frontier_area = kept_frontier_area | frontier.region

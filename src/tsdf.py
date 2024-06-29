@@ -591,9 +591,10 @@ class TSDFPlanner:
             if frontier in filtered_frontiers:
                 continue
             IoU_values = np.asarray([IoU(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
+            pix_diff_values = np.asarray([pix_diff(frontier.region, new_ft['region']) for new_ft in valid_ft_angles])
             print(f'IoU values: {IoU_values}')
             frontier_appended = False
-            if np.any(IoU_values > cfg.region_equal_threshold):
+            if np.any((IoU_values > cfg.region_equal_threshold) | (pix_diff_values <= 3)):
                 # the frontier is not changed (almost)
                 filtered_frontiers.append(frontier)
                 kept_frontier_area = kept_frontier_area | frontier.region
@@ -870,7 +871,7 @@ class TSDFPlanner:
                 # if the pathfinder cannot find a path, then just go to a point between the current point and the target point
                 walk_dir = next_point - cur_point[:2]
                 walk_dir = walk_dir / np.linalg.norm(walk_dir)
-                next_point = cur_point[:2] + walk_dir * max_dist_from_cur
+                next_point = cur_point[:2] + walk_dir * max_dist_from_cur / self._voxel_size
                 # ensure next point is valid, otherwise go backward a bit
                 try_count = 0
                 while (

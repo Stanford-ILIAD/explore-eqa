@@ -578,6 +578,9 @@ def get_proper_step_length(dist, min_length, max_length, min_threshold, max_thre
         return min_length + (max_length - min_length) * (dist - min_threshold) / (max_threshold - min_threshold)
 
 
+def pix_diff(region_1, region_2):
+    # region 1, 2: boolean array of the same shape
+    return np.sum(region_1 | region_2) - np.sum(region_1 & region_2)
 
 
 
