@@ -290,10 +290,6 @@ def main(cfg):
                     rgb = obs["color_sensor"]
                     depth = obs["depth_sensor"]
                     semantic_obs = obs["semantic_sensor"]
-                    if cfg.save_obs:
-                        plt.imsave(
-                            os.path.join(episode_observations_dir, "{}.png".format(cnt_step)), rgb
-                        )
                     rgb = rgba2rgb(rgb)
                     rgb_egocentric_views.append(rgb)
 
@@ -321,6 +317,10 @@ def main(cfg):
                             cfg=cfg.scene_graph,
                             target_obj_id=target_obj_id,
                             return_annotated=True
+                        )
+                    if cfg.save_obs:
+                        plt.imsave(
+                            os.path.join(episode_observations_dir, f"{cnt_step}_view_{view_idx}.png"), annotated_rgb
                         )
 
                     # TSDF fusion

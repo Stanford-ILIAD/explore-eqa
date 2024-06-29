@@ -224,10 +224,10 @@ class TSDFPlanner:
                         bbox_center = bbox_center[[0, 2, 1]]
                         # add to simple scene graph
                         self.simple_scene_graph[obj_id] = bbox_center
+                        adopted_indices.append(i)
 
                     if obj_id == target_obj_id:
                         target_found = True
-                        adopted_indices.append(i)
 
                     break
 
