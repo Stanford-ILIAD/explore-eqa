@@ -97,6 +97,9 @@ def main(cfg):
     dist_from_chosen_to_target_list = []
 
     for scene_id in all_scene_list:
+        if '00723' in scene_id:
+            continue
+
         all_question_id_in_scene = [q for q in all_questions_list if scene_id in q]
 
         ##########################################################
