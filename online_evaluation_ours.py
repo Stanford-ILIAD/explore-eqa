@@ -222,6 +222,9 @@ def main(cfg):
             zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             with torch.no_grad():
                 zero_image_feature = encode(model, image_processor, zero_image).mean(1)
+            plt.imsave(
+                os.path.join(episode_frontier_dir, "zero_image.png"), zero_image
+            )
 
             # run steps
             path_length = 0
@@ -366,7 +369,7 @@ def main(cfg):
                 for i, frontier in enumerate(tsdf_planner.frontiers):
                     if frontier.is_stuck:
                         # if the frontier is stuck, replace it with empty image to avoid repeated choosing
-                        frontier.image = zero_image
+                        frontier.image = os.path.join(episode_frontier_dir, "zero_image.png")
                         frontier.feature = zero_image_feature
                         continue
                     pos_voxel = frontier.position
