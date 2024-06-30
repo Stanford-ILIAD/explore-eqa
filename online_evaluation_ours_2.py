@@ -170,7 +170,7 @@ def main(cfg):
         # Evaluate each question
         for question_id in all_question_id_in_scene:
             question_ind += 1
-            metadata = json.load(open(os.path.join(scene_features_path, question_id, "metadata.json"), "r"))
+            metadata = json.load(open(os.path.join(cfg.path_data_dir, question_id, "metadata.json"), "r"))
 
             # load question data
             question = metadata["question"]
