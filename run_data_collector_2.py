@@ -58,6 +58,7 @@ def main(cfg):
     with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
         questions_data = json.load(f)
     all_scene_list = list(set([q["episode_history"] for q in questions_data]))
+    all_scene_list.sort(key=lambda x: int(x.split("-")[0]), reverse=True)
     logging.info(f"Loaded {len(questions_data)} questions.")
 
     # for each scene, answer each question
