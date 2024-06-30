@@ -207,6 +207,9 @@ def main(cfg):
 
         logging.info(f'\n\nQuestion id {question_id} initialization successful!')
 
+        # init an empty observation for future use
+        zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+
         # run steps
         path_length = 0
         prev_pts = pts.copy()
@@ -235,7 +238,6 @@ def main(cfg):
             keep_forward_observation = False
             observation_kept_count = 0
             rgb_egocentric_views = []
-            zero_image = np.zeros((img_height, img_width, 3), dtype=np.uint8)
             for view_idx, ang in enumerate(all_angles):
                 if cnt_step == 0:
                     keep_forward_observation = True  # at the first exploration step, always keep the forward observation
@@ -309,8 +311,6 @@ def main(cfg):
                         target_obj_id=target_obj_id,
                         return_annotated=True
                     )
-
-                # check stop condition
 
                 # TSDF fusion
                 tsdf_planner.integrate(
@@ -400,8 +400,13 @@ def main(cfg):
                 if first_object_choice is None:
                     # choose a frontier, and set it as the explore target
                     step_dict["frontiers"] = []
-                    # Seems buggy here
+                    # since we skip the stuck frontier for input of the vlm, we need to map the
+                    # vlm output frontier id to the tsdf planner frontier id
+                    ft_id_to_vlm_id = {}
+                    vlm_id_count = 0
                     for i, frontier in enumerate(tsdf_planner.frontiers):
+                        if frontier.is_stuck:
+                            continue
                         frontier_dict = {}
                         pos_voxel = frontier.position
                         pos_world = pos_voxel * tsdf_planner._voxel_size + tsdf_planner._vol_origin[:2]
@@ -412,6 +417,10 @@ def main(cfg):
                         frontier_dict["rgb_id"] = frontier.image
 
                         step_dict["frontiers"].append(frontier_dict)
+
+                        ft_id_to_vlm_id[i] = vlm_id_count
+                        vlm_id_count += 1
+                    vlm_id_to_ft_id = {v: k for k, v in ft_id_to_vlm_id.items()}
 
                     if cfg.egocentric_views:
                         assert len(rgb_egocentric_views) == total_views
@@ -491,13 +500,15 @@ def main(cfg):
                         tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
                         max_point_choice = Object(target_point.astype(int), pred_target_obj_id)
                     else:
-                        if int(target_index) < 0 or int(target_index) >= len(tsdf_planner.frontiers):
-                            logging.info(f"Prediction out of range: {target_index}, {len(tsdf_planner.frontiers)}, failed!")
+                        target_index = int(target_index)
+                        if target_index not in vlm_id_to_ft_id.keys():
+                            logging.info(f"Predicted frontier index invalid: {target_index}, failed!")
                             break
-                        target_point = tsdf_planner.frontiers[int(target_index)].position
+                        target_index = vlm_id_to_ft_id[target_index]
+                        target_point = tsdf_planner.frontiers[target_index].position
                         logging.info(f"Next choice: Frontier at {target_point}")
                         tsdf_planner.frontiers_weight = np.zeros((len(tsdf_planner.frontiers)))
-                        max_point_choice = tsdf_planner.frontiers[int(target_index)]
+                        max_point_choice = tsdf_planner.frontiers[target_index]
 
                         # TODO: modify this: update memory feature only in frontiers (for now)
                         memory_feature = tsdf_planner.frontiers[int(target_index)].feature.to("cpu")
@@ -569,9 +580,6 @@ def main(cfg):
                 ax5.plot(pts_pixs[:, 1], pts_pixs[:, 0], linewidth=5, color="black")
                 ax5.scatter(pts_pixs[0, 1], pts_pixs[0, 0], c="white", s=50)
 
-                # add target object bbox
-                color = 'green' if target_obj_id in tsdf_planner.simple_scene_graph.keys() else 'red'
-
                 fig.tight_layout()
                 plt.savefig(os.path.join(visualization_path, "{}_map.png".format(cnt_step)))
                 plt.close()
@@ -584,6 +592,11 @@ def main(cfg):
             logging.info(f"Current position: {pts}")
             path_length += float(np.linalg.norm(pts - prev_pts))
             prev_pts = pts.copy()
+
+            if len(pts_pixs) >= 3 and np.linalg.norm(pts_pixs[-1] - pts_pixs[-2]) <= 1 and np.linalg.norm(pts_pixs[-2] - pts_pixs[-3]) <= 1:
+                if type(max_point_choice) == Frontier:
+                    logging.info(f"Question id {question_id} stuck at frontier {max_point_choice.position}!!!")
+                    max_point_choice.is_stuck = True
 
             if target_type == "object" and target_arrived:
                 # the model found the target object and arrived at a proper observation point
