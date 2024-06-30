@@ -165,7 +165,7 @@ def main(cfg):
         object_id_to_bbox = {int(item['id']): {'bbox': item['bbox'], 'class': item['class_name']} for item in bounding_box_data}
         object_id_to_name = {int(item['id']): item['class_name'] for item in bounding_box_data}
 
-        scene_feature_map = load_scene_features(cfg.scene_features_path, scene_id)
+        scene_feature_map = load_scene_features(scene_features_path, scene_id)
 
         # Evaluate each question
         for question_id in all_question_id_in_scene:
