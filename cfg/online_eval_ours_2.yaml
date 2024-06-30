@@ -8,8 +8,8 @@ scene_data_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_datasets/hm3d
 semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_obj_bbox_merged'
 detection_model_name: "yolo_world/x"
 scene_features_path_train: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_merged/
-scene_features_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val/
-model_path: /work/pi_chuangg_umass_edu/yuncong/data/checkpoint_mem_0.pt
+scene_features_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val_flexible/
+model_path: /project/pi_chuangg_umass_edu/yuncong/data/checkpoint_all_ego_1.pt
 path_data_dir: exploration_data
 
 egocentric_views: false
