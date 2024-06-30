@@ -63,7 +63,7 @@ def main(cfg):
 
     # Load dataset
     all_questions_list = os.listdir(cfg.path_data_dir)
-    all_questions_list = [question_id for question_id in all_questions_list if 700 < int(question_id.split('-')[0]) <= 800]
+    all_questions_list = [question_id for question_id in all_questions_list if 700 < int(question_id.split('-')[0])]
     total_questions = len(all_questions_list)
     all_scene_list = sorted(
         list(set(
@@ -114,11 +114,12 @@ def main(cfg):
         ##########################################################
 
         # load scene
-        split = "train" if int(scene_id.split("-")[0]) < 800 else "val"
-        scene_mesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.glb")
-        navmesh_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
-        semantic_texture_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.glb")
-        scene_semantic_annotation_path = os.path.join(cfg.scene_data_path, split, scene_id, scene_id.split("-")[1] + ".semantic.txt")
+        scene_path = cfg.scene_data_path_train if int(scene_id.split("-")[0]) < 800 else cfg.scene_data_path_val
+        scene_features_path = cfg.scene_features_path_train if int(scene_id.split("-")[0]) < 800 else cfg.scene_features_path_val
+        scene_mesh_path = os.path.join(scene_path, scene_id, scene_id.split("-")[1] + ".basis.glb")
+        navmesh_path = os.path.join(scene_path, scene_id, scene_id.split("-")[1] + ".basis.navmesh")
+        semantic_texture_path = os.path.join(scene_path, scene_id, scene_id.split("-")[1] + ".semantic.glb")
+        scene_semantic_annotation_path = os.path.join(scene_path, scene_id, scene_id.split("-")[1] + ".semantic.txt")
         bbox_data_path = os.path.join(cfg.semantic_bbox_data_path, scene_id + ".json")
         # assert os.path.exists(scene_mesh_path) and os.path.exists(navmesh_path), f'{scene_mesh_path}, {navmesh_path}'
         # assert os.path.exists(semantic_texture_path) and os.path.exists(scene_semantic_annotation_path), f'{semantic_texture_path}, {scene_semantic_annotation_path}'
@@ -127,6 +128,9 @@ def main(cfg):
             continue
         if not os.path.exists(bbox_data_path):
             logging.info(f"Scene {scene_id} bbox data not found, skip")
+            continue
+        if not os.path.exists(scene_features_path):
+            logging.info(f"Scene {scene_id} features not found, skip")
             continue
 
         try:
@@ -166,7 +170,7 @@ def main(cfg):
         # Evaluate each question
         for question_id in all_question_id_in_scene:
             question_ind += 1
-            metadata = json.load(open(os.path.join(cfg.path_data_dir, question_id, "metadata.json"), "r"))
+            metadata = json.load(open(os.path.join(scene_features_path, question_id, "metadata.json"), "r"))
 
             # load question data
             question = metadata["question"]
