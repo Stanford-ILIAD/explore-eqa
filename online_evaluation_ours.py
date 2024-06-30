@@ -582,6 +582,9 @@ def main(cfg):
                     if type(max_point_choice) == Frontier:
                         logging.info(f"Question id {question_id} stuck at frontier {max_point_choice.position}!!!")
                         max_point_choice.is_stuck = True
+                        # then clear out the chosen frontier to allow choosing another one
+                        tsdf_planner.max_point = None
+                        tsdf_planner.target_point = None
 
                 if target_type == "object" and target_arrived:
                     # the model found the target object and arrived at a proper observation point
