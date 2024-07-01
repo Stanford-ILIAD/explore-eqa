@@ -170,6 +170,7 @@ class TSDFPlanner:
         self.occupied = None
         self.island = None
         self.unexplored_neighbors = None
+        self.occupied_map_camera = None
 
         self.frontiers_weight = None
 
@@ -513,11 +514,15 @@ class TSDFPlanner:
         unexplored_neighbors = ndimage.convolve(
             unexplored, kernel, mode="constant", cval=0.0
         )
+        occupied_map_camera = np.logical_not(
+            self.get_island_around_pts(pts, height=1.2)[0]
+        )
         self.unexplored = unexplored
         self.unoccupied = unoccupied
         self.occupied = occupied
         self.island = island
         self.unexplored_neighbors = unexplored_neighbors
+        self.occupied_map_camera = occupied_map_camera
 
         # detect and update frontiers
         frontier_areas = np.argwhere(
@@ -537,10 +542,6 @@ class TSDFPlanner:
             logging.error(f'Error in find_next_pose_with_path: frontier area size is 0')
             self.frontiers = []
             return False
-
-        occupied_map_camera = np.logical_not(
-            self.get_island_around_pts(pts, height=1.2)[0]
-        )
 
         # cluster frontier regions
         db = DBSCAN(eps=cfg.eps, min_samples=2).fit(frontier_areas)
@@ -868,7 +869,7 @@ class TSDFPlanner:
             ax1.scatter(self.target_point[1], self.target_point[0], c="r", s=80, label="target")
             ax1.set_title("Unoccupied")
 
-            island_high, _ = self.get_island_around_pts(pts, height=1.2)
+            island_high = np.logical_not(self.occupied_map_camera)
             ax2.imshow(island_high)
             for frontier in self.frontiers:
                 if frontier.image is not None:

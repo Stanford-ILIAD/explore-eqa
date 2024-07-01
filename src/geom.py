@@ -4,8 +4,12 @@ import scipy.ndimage as ndimage
 import heapq
 import math
 import logging
-from src.habitat import pos_habitat_to_normal
 from sklearn.cluster import DBSCAN
+
+
+def pos_habitat_to_normal(pts):
+    # -90 deg around x-axis
+    return np.dot(pts, np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]))
 
 
 def get_scene_bnds(pathfinder, floor_height):

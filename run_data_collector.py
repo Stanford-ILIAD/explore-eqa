@@ -29,7 +29,8 @@ from src.habitat import (
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
     get_quaternion,
-    get_navigable_point_to_new
+    get_navigable_point_to_new,
+    get_frontier_observation
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf import TSDFPlanner, Frontier, Object
@@ -52,7 +53,7 @@ def main(cfg):
     with open(os.path.join(cfg.question_data_path, "generated_questions.json")) as f:
         questions_data = json.load(f)
     all_scene_list = list(set([q["episode_history"] for q in questions_data]))
-    all_scene_list.sort(key=lambda x: int(x.split("-")[0]), reverse=True)
+    # all_scene_list.sort(key=lambda x: int(x.split("-")[0]), reverse=True)
     logging.info(f"Loaded {len(questions_data)} questions.")
 
     # for each scene, answer each question
@@ -65,7 +66,7 @@ def main(cfg):
         ##########################################################
         # rand_q = np.random.randint(0, len(all_questions_in_scene) - 1)
         # all_questions_in_scene = all_questions_in_scene[rand_q:rand_q+1]
-        # all_questions_in_scene = [q for q in all_questions_in_scene if '00009-vLpv2VX547B_68_printer' in q['question_id']]
+        # all_questions_in_scene = [q for q in all_questions_in_scene if '421227' in q['question_id']]
         # if len(all_questions_in_scene) == 0:
         #     continue
         # random.shuffle(all_questions_in_scene)
@@ -241,10 +242,13 @@ def main(cfg):
                     main_angle = all_angles.pop(total_views // 2)
                     all_angles.append(main_angle)
 
-                    unoccupied_map, _ = tsdf_planner.get_island_around_pts(
-                        pts_normal, height=1.2
-                    )
-                    occupied_map = np.logical_not(unoccupied_map)
+                    # get the occupied map
+                    if tsdf_planner.occupied_map_camera is None:
+                        occupied_map = np.logical_not(
+                            tsdf_planner.get_island_around_pts(pts_normal, height=1.2)[0]
+                        )
+                    else:
+                        occupied_map = tsdf_planner.occupied_map_camera
 
                     # observe and update the TSDF
                     keep_forward_observation = False
@@ -400,7 +404,6 @@ def main(cfg):
                     pts_normal, angle, pts_pix, fig, path_points = return_values
 
                     # Turn to face each frontier point and get rgb image
-                    # print(f"Start to save {len(tsdf_planner.frontiers)} frontier observations")
                     for i, frontier in enumerate(tsdf_planner.frontiers):
                         frontier_dict = {}
                         pos_voxel = frontier.position
@@ -412,28 +415,18 @@ def main(cfg):
                             frontier_dict["rgb_id"] = frontier.image
                         else:
                             view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                            default_view_direction = np.asarray([0., 0., -1.])
-                            if np.linalg.norm(view_frontier_direction) < 1e-3:
-                                view_frontier_direction = default_view_direction
-                            if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
-                                # if the rotation is to rotate 180 degree, then the quaternion is not unique
-                                # we need to specify rotating along y-axis
-                                agent_state.rotation = quat_to_coeffs(
-                                    quaternion.quaternion(0, 0, 1, 0)
-                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                                ).tolist()
-                            else:
-                                agent_state.rotation = quat_to_coeffs(
-                                    quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                    * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                                ).tolist()
-                            agent.set_state(agent_state)
-                            # Get observation at current pose - skip black image, meaning robot is outside the floor
-                            obs = simulator.get_sensor_observations()
-                            rgb = obs["color_sensor"]
+
+                            frontier_obs = get_frontier_observation(
+                                agent, simulator, cfg, tsdf_planner,
+                                view_frontier_direction=view_frontier_direction,
+                                init_pts=pts,
+                                camera_tilt=camera_tilt,
+                                max_try_count=10
+                            )
+
                             plt.imsave(
                                 os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                                rgb,
+                                frontier_obs,
                             )
                             frontier.image = f"{cnt_step}_{i}.png"
                             frontier_dict["rgb_id"] = f"{cnt_step}_{i}.png"

@@ -1,5 +1,5 @@
 # General
-seed: 66
+seed: 77
 exp_name: vlm_exp_frontiers
 output_parent_dir: results
 question_data_path: "generated_questions"
@@ -29,7 +29,7 @@ save_frontier_video: true
 save_egocentric_view: true
 del_fail_case: false
 
-paths_per_question: 6
+paths_per_question: 1
 
 # Stop criteria
 stop_min_pix_ratio: 0.01  # the target object should occupy at least 1% of the image
@@ -47,6 +47,7 @@ extra_view_angle_deg_phase_2: 60
 
 # Observation filtering
 black_pixel_ratio: 0.2
+black_pixel_ratio_frontier: 0.1
 min_30_percentile_depth: 0.1
 collision_dist: 1
 

@@ -1,6 +1,7 @@
 import numpy as np
 import quaternion
 import habitat_sim
+from .geom import get_collision_distance
 from habitat_sim.utils.common import quat_to_coeffs, quat_from_angle_axis, quat_from_two_vectors, quat_to_angle_axis
 
 
@@ -379,6 +380,88 @@ def get_navigable_point_to_new(pos_end, pathfinder, max_search=1000, min_dist=6,
     # reverse the path_point
     path_point = path_point[::-1]
     return pos_start, path_point, travel_dist
+
+
+def get_frontier_observation(
+        agent, simulator, cfg, tsdf_planner,
+        view_frontier_direction, init_pts, camera_tilt, max_try_count=10
+):
+    agent_state = habitat_sim.AgentState()
+
+    # solve edge cases of viewing direction
+    default_view_direction = np.asarray([0., 0., -1.])
+    if np.linalg.norm(view_frontier_direction) < 1e-3:
+        view_frontier_direction = default_view_direction
+    view_frontier_direction = view_frontier_direction / np.linalg.norm(view_frontier_direction)
+
+    # convert view direction to voxel space
+    # since normal to voxel is just scale and shift, we don't need that conversion
+    view_dir_voxel = pos_habitat_to_normal(view_frontier_direction)[:2]
+
+    # set agent observation direction
+    if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
+        # if the rotation is to rotate 180 degree, then the quaternion is not unique
+        # we need to specify rotating along y-axis
+        agent_state.rotation = quat_to_coeffs(
+            quaternion.quaternion(0, 0, 1, 0)
+            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+        ).tolist()
+    else:
+        agent_state.rotation = quat_to_coeffs(
+            quat_from_two_vectors(default_view_direction, view_frontier_direction)
+            * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
+        ).tolist()
+
+    occupied_map = tsdf_planner.occupied_map_camera
+
+    try_count = 0
+    pts = init_pts.copy()
+    valid_observation = None
+    while try_count < max_try_count:
+        try_count += 1
+
+        # check whether current view is valid
+        collision_dist = tsdf_planner._voxel_size * get_collision_distance(
+            occupied_map,
+            pos=tsdf_planner.habitat2voxel(pts),
+            direction=view_dir_voxel
+        )
+
+        if collision_dist >= cfg.collision_dist:
+            # set agent state
+            agent_state.position = pts
+
+            # get observations
+            agent.set_state(agent_state)
+            obs = simulator.get_sensor_observations()
+            rgb = obs["color_sensor"]
+            depth = obs["depth_sensor"]
+            semantic_obs = obs["semantic_sensor"]
+
+            # check whether the observation is valid
+            keep_observation = True
+            black_pix_ratio = np.sum(semantic_obs == 0) / (cfg.img_height * cfg.img_width)
+            if black_pix_ratio > cfg.black_pixel_ratio_frontier:
+                keep_observation = False
+            positive_depth = depth[depth > 0]
+            if positive_depth.size == 0 or np.percentile(positive_depth, 30) < cfg.min_30_percentile_depth:
+                keep_observation = False
+            if keep_observation:
+                valid_observation = rgb
+                break
+
+        # update pts
+        pts = pts - view_frontier_direction * tsdf_planner._voxel_size
+
+    if valid_observation is not None:
+        return valid_observation
+
+    # if no valid observation is found, then just get the observation at init position
+    agent_state.position = init_pts
+    agent.set_state(agent_state)
+    obs = simulator.get_sensor_observations()
+    return obs["color_sensor"]
+
 
 
 

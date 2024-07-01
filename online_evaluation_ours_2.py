@@ -31,6 +31,7 @@ from src.habitat import (
     pose_habitat_to_normal,
     pose_normal_to_tsdf,
     get_quaternion,
+get_frontier_observation
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf_rollout import TSDFPlanner, Frontier, Object
@@ -247,10 +248,14 @@ def main(cfg):
                 main_angle = all_angles.pop(total_views // 2)
                 all_angles.append(main_angle)
 
-                unoccupied_map, _ = tsdf_planner.get_island_around_pts(
-                    pts_normal, height=1.2
-                )
-                occupied_map = np.logical_not(unoccupied_map)
+                # get the occupied map
+                if tsdf_planner.occupied_map_camera is None:
+                    unoccupied_map, _ = tsdf_planner.get_island_around_pts(
+                        pts_normal, height=1.2
+                    )
+                    occupied_map = np.logical_not(unoccupied_map)
+                else:
+                    occupied_map = tsdf_planner.occupied_map_camera
 
                 # observe and update the TSDF
                 keep_forward_observation = False
@@ -376,30 +381,20 @@ def main(cfg):
                     # Turn to face the frontier point
                     if frontier.image is None:
                         view_frontier_direction = np.asarray([pos_world[0] - pts[0], 0., pos_world[2] - pts[2]])
-                        default_view_direction = np.asarray([0., 0., -1.])
-                        if np.linalg.norm(view_frontier_direction) < 1e-3:
-                            view_frontier_direction = default_view_direction
-                        if np.dot(view_frontier_direction, default_view_direction) / np.linalg.norm(view_frontier_direction) < -1 + 1e-3:
-                            # if the rotation is to rotate 180 degree, then the quaternion is not unique
-                            # we need to specify rotating along y-axis
-                            agent_state.rotation = quat_to_coeffs(
-                                quaternion.quaternion(0, 0, 1, 0)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
-                        else:
-                            agent_state.rotation = quat_to_coeffs(
-                                quat_from_two_vectors(default_view_direction, view_frontier_direction)
-                                * quat_from_angle_axis(camera_tilt, np.array([1, 0, 0]))
-                            ).tolist()
-                        agent.set_state(agent_state)
-                        # Get observation at current pose - skip black image, meaning robot is outside the floor
-                        obs = simulator.get_sensor_observations()
-                        rgb = obs["color_sensor"]
+
+                        frontier_obs = get_frontier_observation(
+                            agent, simulator, cfg, tsdf_planner,
+                            view_frontier_direction=view_frontier_direction,
+                            init_pts=pts,
+                            camera_tilt=camera_tilt,
+                            max_try_count=10
+                        )
+
                         plt.imsave(
                             os.path.join(episode_frontier_dir, f"{cnt_step}_{i}.png"),
-                            rgb,
+                            frontier_obs,
                         )
-                        processed_rgb = rgba2rgb(rgb)
+                        processed_rgb = rgba2rgb(frontier_obs)
                         with torch.no_grad():
                             img_feature = encode(model, image_processor, processed_rgb).mean(1)
                         assert img_feature is not None
