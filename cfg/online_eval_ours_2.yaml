@@ -44,6 +44,7 @@ extra_view_angle_deg_phase_2: 60
 
 # Observation filtering
 black_pixel_ratio: 0.2
+black_pixel_ratio_frontier: 0.1
 min_30_percentile_depth: 0.1
 collision_dist: 1
 
