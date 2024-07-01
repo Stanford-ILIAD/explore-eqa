@@ -92,6 +92,7 @@ def main(cfg):
     # for each scene, answer each question
     question_ind = 0
     success_count = 0
+    same_class_count = 0
 
     success_list = []
     path_length_list = []
@@ -643,6 +644,9 @@ def main(cfg):
                     chosen_obj_bbox_center = tsdf_planner.simple_scene_graph[max_point_choice.object_id]
                     dist_from_chosen_to_target = np.linalg.norm(chosen_obj_bbox_center - obj_bbox_center)
 
+                    if object_id_to_name[max_point_choice.object_id] == target_obj_class:
+                        same_class_count += 1
+
                     break
 
             if target_found:
@@ -657,6 +661,7 @@ def main(cfg):
                 dist_from_chosen_to_target_list.append(dist_from_chosen_to_target)
 
             logging.info(f"{question_ind}/{total_questions}: Success rate: {success_count}/{question_ind}")
+            logging.info(f"Same class ratio: {same_class_count}/{question_ind}")
             logging.info(f"Mean path length for success exploration: {np.mean([x for i, x in enumerate(path_length_list) if success_list[i] == 1])}")
             logging.info(f"Mean path length for all exploration: {np.mean(path_length_list)}")
             logging.info(f"Mean distance from chosen object to target object: {np.mean(dist_from_chosen_to_target_list)}")
@@ -669,6 +674,7 @@ def main(cfg):
     #     pickle.dump(path_length_list, f)
     result_dict = {}
     result_dict["success_rate"] = success_count / question_ind
+    result_dict["same_class_ratio"] = same_class_count / question_ind
     result_dict["mean_path_length"] = np.mean(path_length_list)
     result_dict["mean_success_path_length"] = np.mean([x for i, x in enumerate(path_length_list) if success_list[i] == 1])
     result_dict["mean_distance_from_chosen_to_target"] = np.mean(dist_from_chosen_to_target_list)
