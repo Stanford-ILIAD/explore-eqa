@@ -415,6 +415,7 @@ def main(cfg):
                     step_dict["scene"] = scene_id
                     step_dict["scene_feature_map"] = scene_feature_map
 
+                    # TODO: encapsulate the following code into a function
                     try:
                         sample = get_item(
                             tokenizer, step_dict
@@ -442,6 +443,8 @@ def main(cfg):
                                 max_new_tokens=10,
                             )
                         outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+
+                    ############################
                     try:
                         target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
                         print(f"Prediction: {target_type}, {target_index}")
