@@ -415,7 +415,7 @@ def main(cfg):
                     step_dict["scene"] = scene_id
                     step_dict["scene_feature_map"] = scene_feature_map
 
-                    # TODO: encapsulate the following code into a function
+                    # jiachen TODO: encapsulate the following code into a function
                     try:
                         sample = get_item(
                             tokenizer, step_dict

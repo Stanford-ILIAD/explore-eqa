@@ -10,11 +10,12 @@ semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_o
 detection_model_name: "yolo_world/x"
 questions_list_path: 'data/openeqa_filtered_data_subset.json'
 scene_features_path: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val/
-model_path: /work/pi_chuangg_umass_edu/yuncong/data/checkpoint_merged_filter_rand_ego.pt
+model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_merged_filter_rand_ego.pt
 path_data_dir: exploration_data
 
-egocentric_views: false
+egocentric_views: true
 action_memory: false
+prefiltering: true
 
 # Camera, image
 camera_height: 1.5

@@ -97,7 +97,7 @@ def encode(model, image_processor, img):
     img = model.encode_images(img)
     return img
 
-# TODO: add prefiltering and parts from eval_dataset here
+# jiachen TODO: add prefiltering and parts from eval_dataset here
 
 def get_item(tokenizer, step_dict):
     # load a whole episode and each step within it
