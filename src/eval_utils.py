@@ -181,7 +181,7 @@ def prepare_prefiltering_prompt(question, tokenizer, classes, max_length, topk):
     # print("filtering prompt", len(filter_text))
     # print(filter_text)
     # Jiachen TODO 7: output filter_input_ids/filter_attention_mask/filter_length for the filtering question
-    print("raw text of filter prompt:", filter_text)
+    # print("raw text of filter prompt:", filter_text)
     filter_text = tokenizer(
         filter_text,
         return_tensors="pt",
@@ -223,7 +223,7 @@ def construct_selection_prompt(
     scene_feature = torch.cat(scene_feature, dim=0)
     # format answer
     text += "Answer: "
-    print("final selection prompt \n", text)
+    # print("final selection prompt \n", text)
     
     text = tokenizer(
         text,

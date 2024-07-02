@@ -46,7 +46,7 @@ def infer_prefilter(model, tokenizer, sample):
     # return prefiltered object list
     filter_input_ids = sample.filter_input_ids.to("cuda")
     if len(torch.where(sample.filter_input_ids==22550)[1]) == 0:
-        logging.info(f"Question id {question_id} invalid: no token 22550!")
+        logging.info(f"invalid: no token 'answer'!")
         return None
     answer_ind = torch.where(sample.filter_input_ids==22550)[1][0].item()
     filter_input_ids = filter_input_ids[:, :answer_ind+2]
@@ -56,16 +56,16 @@ def infer_prefilter(model, tokenizer, sample):
                 filter_input_ids,
                 feature_dict=None,
                 do_sample=False,
-                max_new_tokens=30,
+                max_new_tokens=100,
             )
     # parse the prefilter output
         filter_outputs = tokenizer.decode(filter_output_ids[0, filter_input_ids.shape[1]:]).replace("</s>", "").strip()
-    print("the output of prefiltering", filter_outputs)
+    # print("the output of prefiltering", filter_outputs)
     if filter_outputs == "No object available":
         return []
     else:
         filter_outputs = filter_outputs.split("\n")
-        print("parsed output of prefiltering", filter_outputs)
+        # print("parsed output of prefiltering", filter_outputs)
         return filter_outputs
 
 def infer_selection(model, tokenizer, sample):
@@ -76,7 +76,7 @@ def infer_selection(model, tokenizer, sample):
     )
     input_ids = sample.input_ids.to("cuda")
     if len(torch.where(sample.input_ids==22550)[1]) == 0:
-        logging.info(f"Question id {question_id} invalid: no token 22550!")
+        logging.info(f"invalid: no token 'answer'!")
         return None
     answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
     input_ids = input_ids[:, :answer_ind+2]
@@ -529,6 +529,7 @@ def main(cfg):
                     outputs = inference(model, tokenizer, step_dict, cfg)
                     if outputs is None:
                         # encounter generation error
+                        logging.info(f"Question id {question_id} invalid: model generation error!")
                         break
                     ############################
                     try:
