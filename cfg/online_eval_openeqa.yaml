@@ -16,6 +16,7 @@ path_data_dir: exploration_data
 egocentric_views: true
 action_memory: false
 prefiltering: true
+top_k_categories: 5
 
 # Camera, image
 camera_height: 1.5
