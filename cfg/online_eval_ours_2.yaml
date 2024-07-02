@@ -1,19 +1,21 @@
 # General
 seed: 66
-exp_name: exp_online_eval_ours_2
+exp_name: exp_val_flex_filter_ego_mem_ours
 output_parent_dir: /work/pi_chuangg_umass_edu/yuncong/results
 scene_dataset_config_path: "data/hm3d_annotated_basis.scene_dataset_config.json"
 scene_data_path_train: /project/pi_chuangg_umass_edu/yuncong/data_v2/scene_datasets/hm3d/train
 scene_data_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_datasets/hm3d/val
 semantic_bbox_data_path: '/home/yuncongyang_umass_edu/scene_understanding/hm3d_obj_bbox_merged'
 detection_model_name: "yolo_world/x"
-scene_features_path_train: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_merged/
-scene_features_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_val/
-model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_merged_rand_ego.pt
+scene_features_path_train: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_merged_flex/
+scene_features_path_val: /work/pi_chuangg_umass_edu/yuncong/data/scene_feature_dict_merged_flex/
+model_path: /work/pi_chuangg_umass_edu/yuncong/checkpoint_flex_filter_rand_ego_mem_4.pt
 path_data_dir: exploration_data
 
 egocentric_views: true
 action_memory: true
+prefiltering: true
+top_k_categories: 10
 
 # Camera, image
 camera_height: 1.5

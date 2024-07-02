@@ -34,7 +34,7 @@ from src.habitat import (
 )
 from src.geom import get_cam_intr, get_scene_bnds, get_collision_distance
 from src.tsdf_rollout import TSDFPlanner, Frontier, Object
-from src.eval_utils import prepare_step_dict, get_item, encode, load_scene_features, rgba2rgb, load_checkpoint
+from src.eval_utils import prepare_step_dict, get_item, encode, load_scene_features, rgba2rgb, load_checkpoint, collate_wrapper, construct_selection_prompt
 from inference.models import YOLOWorld
 
 from llava.model.builder import load_pretrained_model
@@ -47,6 +47,87 @@ from easydict import EasyDict
 This code choose one frontier/object on each step, rather than walk to the frontier and then choose the next option
 '''
 
+def infer_prefilter(model, tokenizer, sample):
+    # return prefiltered object list
+    filter_input_ids = sample.filter_input_ids.to("cuda")
+    if len(torch.where(sample.filter_input_ids==22550)[1]) == 0:
+        logging.info(f"invalid: no token 'answer'!")
+        return None
+    answer_ind = torch.where(sample.filter_input_ids==22550)[1][0].item()
+    filter_input_ids = filter_input_ids[:, :answer_ind+2]
+    with torch.no_grad():
+        with torch.inference_mode() and torch.autocast(device_type="cuda"):
+            filter_output_ids = model.generate(
+                filter_input_ids,
+                feature_dict=None,
+                do_sample=False,
+                max_new_tokens=100,
+            )
+    # parse the prefilter output
+        filter_outputs = tokenizer.decode(filter_output_ids[0, filter_input_ids.shape[1]:]).replace("</s>", "").strip()
+    # print("the output of prefiltering", filter_outputs)
+    if filter_outputs == "No object available":
+        return []
+    else:
+        filter_outputs = filter_outputs.split("\n")
+        # print("parsed output of prefiltering", filter_outputs)
+        return filter_outputs
+
+def infer_selection(model, tokenizer, sample):
+    feature_dict = EasyDict(
+        scene_feature = sample.scene_feature.to("cuda"),
+        scene_insert_loc = sample.scene_insert_loc,
+        scene_length = sample.scene_length,
+    )
+    input_ids = sample.input_ids.to("cuda")
+    if len(torch.where(sample.input_ids==22550)[1]) == 0:
+        logging.info(f"invalid: no token 'answer'!")
+        return None
+    answer_ind = torch.where(sample.input_ids==22550)[1][0].item()
+    input_ids = input_ids[:, :answer_ind+2]
+    with torch.no_grad():
+        with torch.inference_mode() and torch.autocast(device_type="cuda"):
+            output_ids = model.generate(
+                input_ids,
+                feature_dict=feature_dict,
+                do_sample=False,
+                max_new_tokens=10,
+            )
+        outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+    return outputs
+
+def inference(model, tokenizer, step_dict, cfg):
+    step_dict["use_prefiltering"] = cfg.prefiltering
+    #step_dict["use_egocentric_views"] = cfg.egocentric_views
+    #step_dict["use_action_memory"] = cfg.action_memory
+    step_dict["top_k_categories"] = cfg.top_k_categories
+    try:
+        sample = get_item(
+            tokenizer, step_dict
+        )
+    except:
+        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+        return None
+    if cfg.prefiltering:
+        filter_outputs = infer_prefilter(model,tokenizer,sample)
+        if filter_outputs is None:
+            return None
+        selection_dict = sample.selection_dict[0]
+        selection_input = construct_selection_prompt(
+            tokenizer, 
+            selection_dict.text_before_object,
+            selection_dict.feature_before_object,
+            selection_dict.frontier_text,
+            selection_dict.frontier_features,
+            selection_dict.object_info_dict,
+            1024,
+            True,
+            filter_outputs,
+            cfg.top_k_categories
+        )
+        sample = collate_wrapper([selection_input])
+    outputs = infer_selection(model,tokenizer,sample)
+    return outputs
 
 def main(cfg):
     camera_tilt = cfg.camera_tilt_deg * np.pi / 180
@@ -452,13 +533,14 @@ def main(cfg):
                     step_dict["scene"] = scene_id
                     step_dict["scene_feature_map"] = scene_feature_map
 
-                    # try:
-                    sample = get_item(
-                        tokenizer, step_dict
-                    )
-                    # except:
-                    #     logging.info(f"Get item failed! (most likely no frontiers and no objects)")
-                    #     break
+                    '''
+                    try:
+                        sample = get_item(
+                            tokenizer, step_dict
+                        )
+                    except:
+                        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+                        break
                     feature_dict = EasyDict(
                         scene_feature = sample.scene_feature.to("cuda"),
                         scene_insert_loc = sample.scene_insert_loc,
@@ -479,6 +561,13 @@ def main(cfg):
                                 max_new_tokens=10,
                             )
                         outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+                    '''
+                    outputs = inference(model, tokenizer, step_dict, cfg)
+                    if outputs is None:
+                        # encounter generation error
+                        logging.info(f"Question id {question_id} invalid: model generation error!")
+                        break
+                    ############################
                     try:
                         target_type, target_index = outputs.split(" ")[0], outputs.split(" ")[1]
                         print(f"Prediction: {target_type}, {target_index}")
