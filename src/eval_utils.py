@@ -166,7 +166,7 @@ def prepare_object_input(
     else:
         object_features = torch.stack(object_features, dim=0)
     text += "/\n"
-    print("object prompt \n", text)
+    #print("object prompt \n", text)
     return text, object_features, object_index
 
 def prepare_prefiltering_prompt(question, tokenizer, classes, max_length, topk):
@@ -316,24 +316,25 @@ def get_item(tokenizer, step_dict):
     text += "/\n"
     '''
     for i, sid in enumerate(step["scene_graph"]):
-        if str(sid) not in scene_feature_map.keys() or str(sid) not in obj_map.keys():
+        if str(sid) not in scene_feature_map.keys() or sid not in obj_map.keys():
             continue
         else:
             try:
                 object_feature = scene_feature_map[str(sid)]
-                object_classes.append(obj_map[str(sid)])
+                object_classes.append(obj_map[sid])
                 object_features.append(object_feature)
-                class2object[obj_map[str(sid)]].append(object_index)
+                class2object[obj_map[sid]].append(object_index)
                 object_index += 1
             except:
                 continue
     print("length object features", len(object_features))
-
+    '''
     if len(object_features) == 0:
         # construct zero scene feature if all objects are missed
         object_features = None
     else:
         object_features = torch.stack(object_features, dim = 0)
+    '''
     object_info_dict = EasyDict(
         class2object = class2object,
         classes = object_classes,

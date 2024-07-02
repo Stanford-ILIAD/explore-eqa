@@ -42,7 +42,7 @@ from llava.mm_utils import get_model_name_from_path
 
 from easydict import EasyDict
 
-def infer_prefilter(model, sample):
+def infer_prefilter(model, tokenizer, sample):
     # return prefiltered object list
     filter_input_ids = sample.filter_input_ids.to("cuda")
     if len(torch.where(sample.filter_input_ids==22550)[1]) == 0:
@@ -59,14 +59,16 @@ def infer_prefilter(model, sample):
                 max_new_tokens=30,
             )
     # parse the prefilter output
-        filter_outputs = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).replace("</s>", "").strip()
+        filter_outputs = tokenizer.decode(filter_output_ids[0, filter_input_ids.shape[1]:]).replace("</s>", "").strip()
+    print("the output of prefiltering", filter_outputs)
     if filter_outputs == "No object available":
         return []
     else:
-        filter_outputs = filter_outputs.split(" ")
+        filter_outputs = filter_outputs.split("\n")
+        print("parsed output of prefiltering", filter_outputs)
         return filter_outputs
 
-def infer_selection(model, sample):
+def infer_selection(model, tokenizer, sample):
     feature_dict = EasyDict(
         scene_feature = sample.scene_feature.to("cuda"),
         scene_insert_loc = sample.scene_insert_loc,
@@ -91,16 +93,18 @@ def infer_selection(model, sample):
 
 def inference(model, tokenizer, step_dict, cfg):
     step_dict["use_prefiltering"] = cfg.prefiltering
+    #step_dict["use_egocentric_views"] = cfg.egocentric_views
+    #step_dict["use_action_memory"] = cfg.action_memory
     step_dict["top_k_categories"] = cfg.top_k_categories
-    #try:
-    sample = get_item(
-        tokenizer, step_dict)
-    #    )
-    #except:
-    #    logging.info(f"Get item failed! (most likely no frontiers and no objects)")
-    #    return None
+    try:
+        sample = get_item(
+            tokenizer, step_dict
+        )
+    except:
+        logging.info(f"Get item failed! (most likely no frontiers and no objects)")
+        return None
     if cfg.prefiltering:
-        filter_outputs = infer_prefilter(model, sample)
+        filter_outputs = infer_prefilter(model,tokenizer,sample)
         if filter_outputs is None:
             return None
         selection_dict = sample.selection_dict[0]
@@ -109,7 +113,7 @@ def inference(model, tokenizer, step_dict, cfg):
             selection_dict.text_before_object,
             selection_dict.feature_before_object,
             selection_dict.frontier_text,
-            selection_dict.frontier_feature,
+            selection_dict.frontier_features,
             selection_dict.object_info_dict,
             1024,
             True,
@@ -117,7 +121,7 @@ def inference(model, tokenizer, step_dict, cfg):
             cfg.top_k_categories
         )
         sample = collate_wrapper([selection_input])
-    outputs = infer_selection(model, sample)
+    outputs = infer_selection(model,tokenizer,sample)
     return outputs
 
 def main(cfg):
