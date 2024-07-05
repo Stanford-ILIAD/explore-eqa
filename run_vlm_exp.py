@@ -75,18 +75,18 @@ def main(cfg):
         floor = question_data["floor"]
         scene_floor = scene + "_" + floor
         question = question_data["question"]
-        choices = question_data["choices"]
+        choices = [c.split("'")[1] for c in question_data["choices"].split("',")]
         answer = question_data["answer"]
         init_pts = init_pose_data[scene_floor]["init_pts"]
         init_angle = init_pose_data[scene_floor]["init_angle"]
         logging.info(f"\n========\nIndex: {question_ind} Scene: {scene} Floor: {floor}")
-        logging.info(f"Question: {question} Choices: {choices}, Answer: {answer}")
 
         # Re-format the question to follow LLaMA style
         vlm_question = question
         vlm_pred_candidates = ["A", "B", "C", "D"]
         for token, choice in zip(vlm_pred_candidates, choices):
             vlm_question += "\n" + token + "." + " " + choice
+        logging.info(f"Question:\n{vlm_question}\nAnswer: {answer}")
 
         # Set data dir for this question - set initial data to be saved
         episode_data_dir = os.path.join(cfg.output_dir, str(question_ind))
@@ -198,15 +198,15 @@ def main(cfg):
                     vlm_question
                     + "\nAnswer with the option's letter from the given choices directly."
                 )
-                # logging.info(f"Prompt Pred: {prompt_text}")
+                # logging.info(f"Prompt Pred: {prompt_question}")
                 smx_vlm_pred = vlm.get_loss(
                     rgb_im, prompt_question, vlm_pred_candidates
                 )
                 logging.info(f"Pred - Prob: {smx_vlm_pred}")
 
                 # Get VLM relevancy
-                prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view?"
-                # logging.info(f"Prompt Rel: {prompt_text}")
+                prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view? Answer with Yes or No."
+                # logging.info(f"Prompt Rel: {prompt_rel}")
                 smx_vlm_rel = vlm.get_loss(rgb_im, prompt_rel, ["Yes", "No"])
                 logging.info(f"Rel - Prob: {smx_vlm_rel}")
 
@@ -356,7 +356,7 @@ def main(cfg):
         # Episode summary
         logging.info(f"\n== Episode Summary")
         logging.info(f"Scene: {scene}, Floor: {floor}")
-        logging.info(f"Question: {question}, Choices: {choices}, Answer: {answer}")
+        logging.info(f"Question:\n{vlm_question}\nAnswer: {answer}")
         logging.info(f"Success (weighted): {success_weighted}")
         logging.info(f"Success (max): {success_max}")
         logging.info(

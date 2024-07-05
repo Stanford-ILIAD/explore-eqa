@@ -77,6 +77,7 @@ def main(cfg):
         scene_floor = scene + "_" + floor
         question = question_data["question"]
         choices = question_data["choices"]
+        choices = [c.split("'")[1] for c in question_data["choices"].split("',")]
         answer = question_data["answer"]
         init_pts = init_pose_data[scene_floor]["init_pts"]
         init_angle = init_pose_data[scene_floor]["init_angle"]
@@ -206,7 +207,7 @@ def main(cfg):
                 logging.info(f"Pred - Prob: {smx_vlm_pred}")
 
                 # Get VLM relevancy
-                prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view?"
+                prompt_rel = f"\nConsider the question: '{question}'. Are you confident about answering the question with the current view? Answer with Yes or No."
                 # logging.info(f"Prompt Rel: {prompt_text}")
                 smx_vlm_rel = vlm.get_loss(rgb_im, prompt_rel, ["Yes", "No"])
                 logging.info(f"Rel - Prob: {smx_vlm_rel}")
@@ -307,7 +308,7 @@ def main(cfg):
         # Summary
         logging.info(f"\n== Trial Summary")
         logging.info(f"Scene: {scene}, Floor: {floor}")
-        logging.info(f"Question: {question}, Choices: {choices}, Answer: {answer}")
+        logging.info(f"Question:\n{vlm_question}\nAnswer: {answer}")
         logging.info(f"Success (weighted): {success_weighted}")
         logging.info(f"Success (max): {success_max}")
         logging.info(
